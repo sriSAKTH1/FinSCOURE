@@ -778,18 +778,31 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
   return (
     <div className="w-full space-y-6 pb-16 animate-in fade-in duration-300">
       {/* TOP NAVIGATION & CONTROLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
         <button
           type="button"
           onClick={onBackToHome}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-black bg-white hover:bg-zinc-50 border border-zinc-200 shadow-2xs transition-all cursor-pointer w-fit"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-black bg-white hover:bg-zinc-50 border border-zinc-200 shadow-2xs transition-all cursor-pointer w-fit z-10"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to FinScore Home</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-zinc-500 hidden md:inline">
+        {/* Center: Fixed Logo */}
+        <div
+          onClick={onBackToHome}
+          className="sm:absolute sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 flex items-center justify-center cursor-pointer select-none py-1"
+          title="FinScore — Fix your finances with me!"
+        >
+          <img
+            src="/logo.png"
+            alt="FinScore — Fix Your Finance With Me!"
+            className="h-10 sm:h-12 md:h-13 w-auto object-contain hover:opacity-90 transition-opacity drop-shadow-xs"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 z-10">
+          <span className="text-xs text-zinc-500 hidden lg:inline">
             Official Indian standard compounding rules (₹ INR)
           </span>
           <button

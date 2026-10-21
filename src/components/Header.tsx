@@ -17,22 +17,14 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ activePage = 'home', onNavigate }) => {
-  // Otherwise Assessment and Score Dashboard don't show logo on top
-  if (activePage === 'assessment' || activePage === 'dashboard') {
+  // Only show top logo on home page; calculation has it in its header, Assessment/Dashboard don't show on top
+  if (activePage !== 'home') {
     return null;
   }
 
-  const isCenter = activePage === 'calculators';
-
   return (
     <div className="sticky top-0 z-50 pointer-events-none w-full print:hidden">
-      <div
-        className={`w-full pt-4 sm:pt-6 pb-2 flex items-center ${
-          isCenter
-            ? 'justify-center px-4'
-            : 'justify-start pl-6 sm:pl-8 md:pl-10 pr-4'
-        }`}
-      >
+      <div className="w-full pt-4 sm:pt-6 pb-2 flex items-center justify-start pl-6 sm:pl-8 md:pl-10 pr-4">
         <div
           onClick={() => onNavigate('home')}
           className="pointer-events-auto flex items-center cursor-pointer group select-none shrink-0"
