@@ -37,6 +37,8 @@ import {
 interface AssetAllocationAdvisorProps {
   assessment: AssessmentData;
   scoreResult: FinScoreResult;
+  isOpen?: boolean;
+  onToggleOpen?: (open: boolean) => void;
 }
 
 interface AgeAllocationRule {
@@ -119,10 +121,23 @@ function getAgeAllocationRule(age: number): AgeAllocationRule {
 export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
   assessment,
   scoreResult,
+  isOpen: controlledIsOpen,
+  onToggleOpen,
 }) => {
   // Starts CLOSED (collapsed) by default as requested: "give the closed componet click and show"
-  const [isOpen, setIsOpen] = useState(false);
+  const [localIsOpen, setLocalIsOpen] = useState(false);
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
+
+  const isControlled = controlledIsOpen !== undefined;
+  const isOpen = isControlled ? controlledIsOpen : localIsOpen;
+
+  const setOpen = (open: boolean) => {
+    if (onToggleOpen) {
+      onToggleOpen(open);
+    } else {
+      setLocalIsOpen(open);
+    }
+  };
 
   // Currency is strictly INR (₹) as requested: "and the amound in inr only"
   const currency: CurrencyCode = 'INR';
@@ -213,16 +228,20 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
 
     assessment.assets.forEach((a) => {
       const val = parseNum(a.currentValue);
-      if (a.category === 'stocks_mf') {
+      if (a.category === 'stocks') {
+        directEquityVal += val;
+      } else if (a.category === 'mf') {
+        mutualFundsVal += val;
+      } else if (a.category === 'stocks_mf') {
         const nameLower = (a.name || '').toLowerCase();
         if (nameLower.includes('stock') || nameLower.includes('equity') || nameLower.includes('share')) {
           directEquityVal += val;
         } else {
           mutualFundsVal += val;
         }
-      } else if (a.category === 'gold' || a.category === 'crypto_alt') {
+      } else if (a.category === 'gold' || a.category === 'gold_other' || a.category === 'crypto_alt' || a.category === 'other') {
         goldOtherVal += val;
-      } else if (a.category === 'epf_ppf_nps' || a.category === 'fixed_deposits' || a.category === 'cash_bank') {
+      } else if (a.category === 'epf_ppf_nps' || a.category === 'fixed_deposits' || a.category === 'cash_bank' || a.category === 'real_estate') {
         bondsGovtVal += val;
       }
     });
@@ -263,7 +282,7 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
           if (!isOpen) {
             setShowDisclaimerModal(true);
           } else {
-            setIsOpen(false);
+            setOpen(false);
           }
         }}
         onKeyDown={(e) => {
@@ -271,7 +290,7 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
             if (!isOpen) {
               setShowDisclaimerModal(true);
             } else {
-              setIsOpen(false);
+              setOpen(false);
             }
           }
         }}
@@ -311,10 +330,23 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              setShowDisclaimerModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 transition-all cursor-pointer"
+            title="View SEBI Regulatory Warnings and Disclaimers"
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Advisory Warning</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
               if (!isOpen) {
                 setShowDisclaimerModal(true);
               } else {
-                setIsOpen(false);
+                setOpen(false);
               }
             }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold bg-teal-500 hover:bg-teal-400 text-zinc-950 shadow-md transition-all cursor-pointer"
@@ -327,52 +359,67 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
 
       {/* SEBI REGULATORY ADVISORY WARNING MODAL (POPS UP ON CLICK) */}
       {showDisclaimerModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-zinc-200 max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-6 h-6 text-amber-600" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                  Advisory Notice
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                  Regulatory Advisory & Disclaimer
                 </span>
                 <h4 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight mt-0.5">
-                  SEBI Regulatory Disclaimer
+                  SEBI Regulatory Warnings & Disclaimers
                 </h4>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-xs sm:text-sm text-amber-950 leading-relaxed font-semibold space-y-2">
-              <p>
-                ⚠️ <strong>This is not a SEBI-registered plan.</strong>
-              </p>
-              <p className="font-normal text-amber-900 text-xs">
-                Please contact any SEBI-registered investment advisor for bespoke personal portfolio management.
-              </p>
+            <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-xs sm:text-sm text-amber-950 leading-relaxed space-y-2.5">
+              <div className="font-extrabold flex items-center gap-1.5 text-amber-900">
+                <span>⚠️</span>
+                <span>This is NOT a formal SEBI-registered financial advisory.</span>
+              </div>
+              <ul className="text-xs text-amber-900/95 space-y-1.5 list-disc list-inside">
+                <li>
+                  <strong>We are NOT SEBI-registered investment advisors</strong>, wealth managers, or portfolio management service (PMS) providers.
+                </li>
+                <li>
+                  <strong>Please contact a certified SEBI-registered advisor</strong> before allocating personal capital into specific stocks, mutual funds, or debt assets.
+                </li>
+                <li>
+                  <strong>Strictly for educational & illustrative purposes only.</strong> Percentages represent generic age-based mathematical frameworks (e.g., 100 minus age formula).
+                </li>
+                <li>
+                  <strong>This website is an experimental calculation tool and is not completely finalized.</strong> FinScore and its authors are <strong>not responsible or legally liable</strong> for any capital loss, market fluctuations, or decisions made using this software.
+                </li>
+              </ul>
             </div>
 
             <p className="text-xs text-zinc-500 leading-normal">
-              The age-based allocation strategy provided here is a mathematical, educational model designed to illustrate life-stage asset distribution concepts. It does not constitute individualized financial advice.
+              Market investments are subject to risk. Past theoretical performance does not guarantee future results.
             </p>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-100">
               <button
                 type="button"
-                onClick={() => setShowDisclaimerModal(false)}
+                onClick={() => {
+                  setShowDisclaimerModal(false);
+                  setOpen(false); // Cancel closes the section as requested: "else cancel close the that both"
+                }}
                 className="px-4 py-2.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-700 transition-colors cursor-pointer"
               >
-                Cancel
+                Cancel & Close
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setShowDisclaimerModal(false);
-                  setIsOpen(true);
+                  setOpen(true);
                 }}
                 className="px-6 py-2.5 rounded-xl bg-[#1b4d3e] hover:bg-[#143d31] text-xs font-black text-white shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                OK
+                OK, Understand
               </button>
             </div>
           </div>
@@ -1296,6 +1343,21 @@ export const AssetAllocationAdvisor: React.FC<AssetAllocationAdvisorProps> = ({
                       <li><strong>Safety First:</strong> Ensure you have established a 6-month emergency fund and adequate health cover before allocating heavily to equities.</li>
                       <li><strong>Educational Advisory:</strong> This asset allocation blueprint is a mathematical rule-based advisory tool based on standard financial planning frameworks. Consult a SEBI-registered investment advisor for bespoke personal portfolio management.</li>
                     </ul>
+                  </div>
+
+                  {/* Bottom Advisory & SEBI Warning Bar */}
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs text-amber-900 font-medium">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Compliance Notice: This is an educational mathematical allocation plan and not SEBI-registered advisory.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDisclaimerModal(true)}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-2xs shrink-0 cursor-pointer"
+                    >
+                      View Full Warnings List
+                    </button>
                   </div>
                 </div>
               </div>

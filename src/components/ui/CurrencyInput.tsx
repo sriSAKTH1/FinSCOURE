@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CurrencyCode, ExpenseFrequency } from '@/types/assessment';
-import { CURRENCY_SYMBOLS } from '@/utils/calculations';
-import { formatPriceWithWords, parseShorthandAmount } from '../../utils/numberToWords';
+import { formatPriceWithWords, parseShorthandAmount, getPriceHighlight } from '@/utils/numberToWords';
 import { FrequencyToggle } from './FrequencyToggle';
 
 interface CurrencyInputProps {
@@ -27,7 +26,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   value,
   onChange,
   currency = 'INR',
-  placeholder = 'e.g. 1k, 2L, 1Cr or 50000',
+  placeholder = 'eg. 1k',
   frequency,
   onFrequencyChange,
   helperText,
@@ -37,7 +36,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   showPriceInWords = true,
   showQuickChips = false,
 }) => {
-  const symbol = CURRENCY_SYMBOLS[currency] || '₹';
+  const symbol = '₹';
   const isMuted = frequency === 'N';
 
   // Local text input state to allow typing shorthand like "1k", "2l", "1cr"
@@ -85,26 +84,17 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   };
 
   const numericValue = typeof value === 'number' ? value : parseShorthandAmount(value);
-  const priceWords = formatPriceWithWords(isMuted ? 0 : numericValue, currency);
+  const highlight = isMuted ? null : getPriceHighlight(numericValue, 'INR');
 
-  const quickChips = currency === 'INR' 
-    ? [
-        { label: '1k', val: 1000 },
-        { label: '10k', val: 10000 },
-        { label: '50k', val: 50000 },
-        { label: '1L', val: 100000 },
-        { label: '5L', val: 500000 },
-        { label: '10L', val: 1000000 },
-        { label: '1Cr', val: 10000000 },
-      ]
-    : [
-        { label: '1k', val: 1000 },
-        { label: '10k', val: 10000 },
-        { label: '50k', val: 50000 },
-        { label: '100k', val: 100000 },
-        { label: '500k', val: 500000 },
-        { label: '1M', val: 1000000 },
-      ];
+  const quickChips = [
+    { label: '1k', val: 1000 },
+    { label: '10k', val: 10000 },
+    { label: '50k', val: 50000 },
+    { label: '1L', val: 100000 },
+    { label: '5L', val: 500000 },
+    { label: '10L', val: 1000000 },
+    { label: '1Cr', val: 10000000 },
+  ];
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
@@ -122,12 +112,12 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
               : 'border-zinc-200 hover:border-zinc-300 focus-within:border-[#1b4d3e] focus-within:ring-3 focus-within:ring-[#1b4d3e]/10'
           }`}
         >
-          {/* Currency Prefix */}
-          <span className="pl-4 text-zinc-400 select-none text-sm sm:text-base font-medium">
-            {symbol}
+          {/* INR Currency Symbol Prefix */}
+          <span className="pl-4 text-emerald-800 select-none text-sm sm:text-base font-bold">
+            ₹
           </span>
 
-          {/* Number & Shorthand Input (Supports 1k, 2L, 1Cr, etc.) */}
+          {/* Number & Shorthand Input (Supports 100, 1k, 1L, 1Cr, 50000, etc.) */}
           <input
             type="text"
             disabled={disabled || isMuted}
@@ -151,16 +141,27 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         )}
       </div>
 
-      {/* Real-time Price & Words Preview (Always shows: e.g. ₹8,00,000 (8L) • Eight Lakh Rupees) */}
-      {showPriceInWords && (
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold text-[#1b4d3e] bg-[#eaf5ef] rounded-lg border border-[#c1e1d2] shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1b4d3e]" />
-            <span>{priceWords}</span>
+      {/* Real-time Highlighted Amount Preview: Shows compact tag (100, 1k, 1L, 1Cr) + formatted amount + words only when a value is entered */}
+      {showPriceInWords && !isMuted && highlight && (
+        <div className="flex flex-wrap items-center gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-[#eaf5ef] text-[#1b4d3e] rounded-xl border border-[#b7dfcb] shadow-xs">
+            {/* Shorthand Tag Badge (100, 1k, 1L, 1Cr) */}
+            <span className="px-2 py-0.5 rounded-md bg-[#1b4d3e] text-white font-black text-xs tracking-wide shadow-2xs">
+              {highlight.compact}
+            </span>
+            {/* Formatted Number */}
+            <span className="font-extrabold text-zinc-900 text-xs sm:text-sm">
+              {highlight.formatted}
+            </span>
+            <span className="text-emerald-400 font-bold">•</span>
+            {/* Indian Numbering Words */}
+            <span className="font-semibold text-[#1b4d3e] text-[11px] sm:text-xs">
+              {highlight.words}
+            </span>
           </div>
 
           {/* Quick Shorthand Clickable Chips if enabled */}
-          {showQuickChips && !isMuted && (
+          {showQuickChips && (
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-zinc-400 font-medium mr-0.5">Quick:</span>
               {quickChips.map((chip) => (
@@ -169,9 +170,9 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
                   type="button"
                   onClick={() => {
                     onChange(chip.val);
-                    setInputText(String(chip.val));
+                    setInputText(chip.label);
                   }}
-                  className="px-1.5 py-0.5 text-[10px] font-bold text-zinc-600 hover:text-[#1b4d3e] bg-zinc-100 hover:bg-[#eaf5ef] rounded border border-zinc-200 transition-colors cursor-pointer"
+                  className="px-2 py-0.5 text-[11px] font-bold text-zinc-700 hover:text-[#1b4d3e] bg-zinc-100 hover:bg-[#eaf5ef] rounded-md border border-zinc-200 transition-colors cursor-pointer"
                 >
                   {chip.label}
                 </button>

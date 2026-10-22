@@ -5,13 +5,17 @@ export type EmploymentType = 'salaried' | 'self-employed' | 'freelancer' | 'busi
 export type LoanType = 'home' | 'personal' | 'auto' | 'education' | 'credit_card' | 'consumer_durable' | 'other';
 
 export type AssetCategory =
+  | 'stocks'
+  | 'mf'
+  | 'gold'
   | 'stocks_mf'
+  | 'gold_other'
   | 'fixed_deposits'
   | 'epf_ppf_nps'
-  | 'gold'
   | 'real_estate'
   | 'cash_bank'
-  | 'crypto_alt';
+  | 'crypto_alt'
+  | 'other';
 
 export type GoalCategory = 'home' | 'education' | 'retirement' | 'vehicle' | 'wealth' | 'wedding' | 'other';
 

@@ -22,6 +22,24 @@ import { ArrowLeft, ArrowRight, RotateCcw, Home, AlertCircle } from 'lucide-reac
 export type ActivePage = 'home' | 'assessment' | 'dashboard' | 'calculators';
 export type AppTheme = 'normal' | 'light-green' | 'light-blue';
 
+export const PAGE_ROUTES: Record<ActivePage, string> = {
+  home: '/home',
+  calculators: '/calculator',
+  assessment: '/Assessment',
+  dashboard: '/scoreDashboard',
+};
+
+export const ROUTE_PAGES: Record<string, ActivePage> = {
+  '/': 'home',
+  '/home': 'home',
+  '/calculator': 'calculators',
+  '/calculators': 'calculators',
+  '/Assessment': 'assessment',
+  '/assessment': 'assessment',
+  '/scoreDashboard': 'dashboard',
+  '/dashboard': 'dashboard',
+};
+
 const STORAGE_KEY = 'finscore_assessment_draft_v2';
 const THEME_STORAGE_KEY = 'finscore_active_theme';
 
@@ -36,6 +54,51 @@ export default function App() {
   const [hasDraft, setHasDraft] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Synchronize React page state with browser URL path
+  const navigateTo = useCallback((page: ActivePage, options?: { calcId?: CalculatorId }) => {
+    if (options?.calcId) {
+      setActiveCalculatorId(options.calcId);
+    }
+    setActivePage(page);
+    const targetPath = PAGE_ROUTES[page] || '/home';
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState({ page }, '', targetPath);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Sync initial page with URL on first load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      const matchedPage = ROUTE_PAGES[currentPath] || ROUTE_PAGES[currentPath.toLowerCase()];
+      if (matchedPage) {
+        setActivePage(matchedPage);
+        const canonical = PAGE_ROUTES[matchedPage];
+        if (window.location.pathname !== canonical) {
+          window.history.replaceState({ page: matchedPage }, '', canonical);
+        }
+      } else {
+        // Fallback to /home
+        window.history.replaceState({ page: 'home' }, '', '/home');
+      }
+      document.title = 'FInSCOURE -Fix Your Finances With Me !';
+    }
+  }, []);
+
+  // Listen to browser Back and Forward button events
+  useEffect(() => {
+    const handlePopState = () => {
+      const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      const matchedPage = ROUTE_PAGES[currentPath] || ROUTE_PAGES[currentPath.toLowerCase()];
+      if (matchedPage) {
+        setActivePage(matchedPage);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Restore draft and theme from localStorage on mount
   useEffect(() => {
     try {
@@ -49,15 +112,33 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setAssessment(parsed);
-        if (parsed.step && parsed.step >= 1 && parsed.step <= 8) {
-          setCurrentStep(parsed.step);
+        const hasActualData = Boolean(
+          parsed.personal?.firstName?.trim() ||
+          (typeof parsed.personal?.monthlyTakeHome === 'number' && parsed.personal.monthlyTakeHome > 0) ||
+          (parsed.loans && parsed.loans.length > 0) ||
+          (parsed.assets && parsed.assets.length > 0)
+        );
+
+        if (hasActualData) {
+          setAssessment(parsed);
+          if (parsed.step && parsed.step >= 1 && parsed.step <= 8) {
+            setCurrentStep(parsed.step);
+          }
+          setLastSavedAt('just now');
+          setHasDraft(true);
+        } else {
+          setAssessment(DEFAULT_ASSESSMENT);
+          setCurrentStep(1);
+          setHasDraft(false);
         }
-        setLastSavedAt('just now');
-        setHasDraft(true);
+      } else {
+        setAssessment(DEFAULT_ASSESSMENT);
+        setCurrentStep(1);
+        setHasDraft(false);
       }
     } catch (e) {
       console.warn('Could not read saved draft or theme', e);
+      setAssessment(DEFAULT_ASSESSMENT);
     }
     setIsInitialized(true);
   }, []);
@@ -68,8 +149,8 @@ export default function App() {
         prevTheme === 'normal'
           ? 'light-green'
           : prevTheme === 'light-green'
-          ? 'light-blue'
-          : 'normal';
+            ? 'light-blue'
+            : 'normal';
       try {
         localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
         document.documentElement.setAttribute('data-theme', nextTheme);
@@ -138,8 +219,7 @@ export default function App() {
     if (sample) {
       setAssessment(sample.data);
       setCurrentStep(8);
-      setActivePage('dashboard');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      navigateTo('dashboard');
     }
   };
 
@@ -149,11 +229,10 @@ export default function App() {
       localStorage.removeItem(STORAGE_KEY);
       setAssessment(DEFAULT_ASSESSMENT);
       setCurrentStep(1);
-      setActivePage('home');
+      navigateTo('home');
       setLastSavedAt('');
       setHasDraft(false);
       setValidationError(null);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -203,8 +282,7 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       // Step 8 -> Calculate & Show Dashboard
-      setActivePage('dashboard');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      navigateTo('dashboard');
     }
   };
 
@@ -224,8 +302,7 @@ export default function App() {
     }
     setValidationError(null);
     setCurrentStep(step);
-    setActivePage('assessment');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateTo('assessment');
   };
 
   // Score computation (memoized)
@@ -238,10 +315,7 @@ export default function App() {
       {/* FIXED TOP HEADER WITH LOGO ON TOP-LEFT (STAYS VISIBLE ON SCROLL) */}
       <Header
         activePage={activePage}
-        onNavigate={(page) => {
-          setActivePage(page);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onNavigate={(page) => navigateTo(page)}
         currency={assessment.personal.currency}
         onCurrencyChange={(curr) => {
           setAssessment((prev) => ({
@@ -257,26 +331,21 @@ export default function App() {
 
       {/* MAIN CANVAS */}
       <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-3 sm:py-5">
-        
+
         {/* PAGE 1: HOME PAGE */}
         {activePage === 'home' && (
           <div className="w-full">
             <HomePage
               onStartAssessment={() => {
-                setActivePage('assessment');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setAssessment(DEFAULT_ASSESSMENT);
+                setCurrentStep(1);
+                setValidationError(null);
+                navigateTo('assessment');
               }}
               onViewSample={(sampleKey) => handleLoadSample(sampleKey)}
-              onSelectCalculator={(calcId) => {
-                setActiveCalculatorId(calcId);
-                setActivePage('calculators');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onSelectCalculator={(calcId) => navigateTo('calculators', { calcId })}
               hasDraft={hasDraft}
-              onResumeDraft={() => {
-                setActivePage('assessment');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onResumeDraft={() => navigateTo('assessment')}
             />
           </div>
         )}
@@ -349,7 +418,7 @@ export default function App() {
                   data={assessment}
                   onNavigateToStep={handleStepJump}
                   onConfirmAndCalculate={() => {
-                    setActivePage('dashboard');
+                    navigateTo('dashboard');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                 />
@@ -362,11 +431,10 @@ export default function App() {
                 type="button"
                 onClick={handleBack}
                 disabled={currentStep === 1}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
-                  currentStep === 1
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer ${currentStep === 1
                     ? 'opacity-40 border-zinc-200 text-zinc-400 cursor-not-allowed'
                     : 'border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 hover:border-zinc-300 shadow-2xs'
-                }`}
+                  }`}
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
@@ -391,12 +459,12 @@ export default function App() {
               assessment={assessment}
               scoreResult={scoreResult}
               onRetake={() => {
-                setActivePage('assessment');
+                navigateTo('assessment');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onReset={handleReset}
               onHome={() => {
-                setActivePage('home');
+                navigateTo('home');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onUpdateAssessment={(updated) => {
@@ -412,11 +480,11 @@ export default function App() {
             <CalculatorsPage
               initialCalculator={activeCalculatorId}
               onBackToHome={() => {
-                setActivePage('home');
+                navigateTo('home');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onStartAssessment={() => {
-                setActivePage('assessment');
+                navigateTo('assessment');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
@@ -429,11 +497,11 @@ export default function App() {
         <div className="w-full px-4 sm:px-8 lg:px-14 flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Footer Left: Official Logo */}
           <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="FinScore — Fix Your Finance With Me!" 
+            <img
+              src="/logo.png"
+              alt="FinScore — Fix Your Finance With Me!"
               className="h-8 sm:h-9 w-auto object-contain cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => { setActivePage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onClick={() => { navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               title="Back to Top"
             />
             <p className="text-zinc-600 text-xs text-left hidden sm:block">
@@ -447,10 +515,10 @@ export default function App() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-zinc-600">
-            <button type="button" onClick={() => { setActivePage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Home</button>
-            <button type="button" onClick={() => { setActiveCalculatorId('sip'); setActivePage('calculators'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Calculators</button>
-            <button type="button" onClick={() => { setActivePage('assessment'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Assessment</button>
-            <button type="button" onClick={() => { setActivePage('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Score Dashboard</button>
+            <button type="button" onClick={() => { navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Home</button>
+            <button type="button" onClick={() => { navigateTo('calculators', { calcId: 'sip' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Calculators</button>
+            <button type="button" onClick={() => { navigateTo('assessment'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Assessment</button>
+            <button type="button" onClick={() => { navigateTo('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Score Dashboard</button>
           </div>
         </div>
       </footer>

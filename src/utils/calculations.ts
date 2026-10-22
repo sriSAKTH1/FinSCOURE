@@ -27,7 +27,7 @@ export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
 };
 
 export function formatCurrency(amount: number, currency: CurrencyCode = 'INR'): string {
-  const symbol = CURRENCY_SYMBOLS[currency] || '$';
+  const symbol = CURRENCY_SYMBOLS[currency] || '₹';
   const rounded = Math.round(amount);
 
   if (currency === 'INR') {
@@ -585,7 +585,100 @@ export function generateRecommendations(
 export function calculateFinScore(data: AssessmentData): FinScoreResult {
   const monthlyIncome = calculateTotalMonthlyIncome(data);
   const expenseBreakdown = calculateTotalMonthlyExpenses(data.expenses, data.customExpenses);
-  const currency = data.personal.currency || 'INR';
+  const currency = data.personal?.currency || 'INR';
+
+  const isCompletelyEmpty =
+    monthlyIncome === 0 &&
+    expenseBreakdown.total === 0 &&
+    (!data.personal?.firstName || data.personal.firstName.trim() === '') &&
+    (!data.assets || data.assets.length === 0) &&
+    (!data.loans || data.loans.length === 0) &&
+    parseNum(data.emergencyFund?.liquidSavings) === 0;
+
+  if (isCompletelyEmpty) {
+    return {
+      totalScore: 0,
+      grade: 'D',
+      gradeTitle: 'No Assessment Data Recorded',
+      gradeDescription: 'Fill out your assessment to evaluate your financial health score across all 4 diagnostic pillars.',
+      pillarScores: {
+        emergencyFund: {
+          score: 0,
+          coverageScore: 0,
+          accessibilityScore: 0,
+          coverageMonths: 0,
+          essentialMonthlyExpenses: 0,
+          targetMonths: 6,
+          targetAmount: 0,
+          shortfall: 0,
+          progressPercentage: 0,
+          recommendedMonthlySavings: 0,
+        },
+        insuranceProtection: {
+          score: 0,
+          healthScore: 0,
+          lifeScore: 0,
+          healthSumInsured: 0,
+          targetHealthCover: 0,
+          lifeSumAssured: 0,
+          targetLifeCover: 0,
+          dependentsCount: 0,
+          isLifeNeeded: false,
+          totalAnnualPremiums: 0,
+          protectionGaps: ['No health or life policies recorded.'],
+        },
+        savingsHealth: {
+          score: 0,
+          savingsRateScore: 0,
+          cashFlowScore: 0,
+          consistencyScore: 0,
+          monthlyIncome: 0,
+          monthlyExpenses: 0,
+          monthlySurplus: 0,
+          savingsRate: 0,
+          targetMonthlySavings: 0,
+        },
+        debtHealth: {
+          score: 0,
+          emiScore: 0,
+          highInterestScore: 0,
+          repaymentScore: 0,
+          totalDebtPrincipal: 0,
+          totalMonthlyEmi: 0,
+          emiToIncomeRatio: 0,
+          highInterestDebt: 0,
+          hasOverdueDebt: false,
+          overdueAmount: 0,
+        },
+      },
+      metrics: {
+        totalNetWorth: 0,
+        totalAssets: 0,
+        totalLiquidAssets: 0,
+        totalMonthlyInvestments: 0,
+        debtToAssetRatio: 0,
+        goalsAnalysis: [],
+      },
+      swot: {
+        strengths: ['Assessment ready to begin.'],
+        weaknesses: ['No financial metrics provided yet.'],
+        opportunities: ['Complete all 8 assessment steps to unlock custom scoring and debt/asset optimization.'],
+        threats: ['Unassessed financial blindspots may increase vulnerability.'],
+      },
+      recommendations: [
+        {
+          id: 'start-assessment',
+          pillar: 'savings',
+          priority: 'high',
+          title: 'Complete Your Assessment',
+          action: 'Enter your monthly salary, living expenses, and current assets to generate a full diagnostic evaluation.',
+          estimatedScoreGain: 100,
+          iconType: 'trending-up',
+        },
+      ],
+      currency,
+    };
+  }
 
   // Calculate debts first to feed into savings and emergency
   const debtHealth = calculateDebtScore(data, monthlyIncome);

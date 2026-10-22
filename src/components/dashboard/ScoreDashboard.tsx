@@ -10,17 +10,19 @@ import { SwotMatrix } from './SwotMatrix';
 import { RecommendationsList } from './RecommendationsList';
 import { PersonalBalanceSheet } from './PersonalBalanceSheet';
 import { AssetAllocationAdvisor } from './AssetAllocationAdvisor';
+import { DebtRepaymentAdvisor } from './DebtRepaymentAdvisor';
+import { ScoreReportPrint } from './ScoreReportPrint';
 import { formatCurrency } from '@/utils/calculations';
 import confetti from 'canvas-confetti';
-import { 
-  Printer, 
-  RotateCcw, 
-  Edit3, 
-  Sparkles, 
-  ShieldCheck, 
-  Target, 
-  PieChart, 
-  TrendingUp, 
+import {
+  Printer,
+  RotateCcw,
+  Edit3,
+  Sparkles,
+  ShieldCheck,
+  Target,
+  PieChart,
+  TrendingUp,
   Coins,
   Home,
   Eye,
@@ -45,6 +47,75 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
   onUpdateAssessment,
 }) => {
   const { totalScore, grade, gradeTitle, gradeDescription, pillarScores, swot, recommendations, metrics, currency } = scoreResult;
+
+  // Vibrant full-color celebration confetti pop when opening Score Dashboard
+  useEffect(() => {
+    // Only pop colorful celebration when there is actual calculated score/activity
+    const colors = [
+      '#10b981', // emerald
+      '#3b82f6', // royal blue
+      '#f59e0b', // vibrant amber
+      '#ec4899', // bright pink
+      '#8b5cf6', // purple
+      '#ef4444', // ruby red
+      '#06b6d4', // cyan
+      '#eab308', // gold
+      '#14b8a6', // teal
+    ];
+
+    try {
+      // Cannon 1 & 2: Left & Right dual burst
+      confetti({
+        particleCount: 75,
+        angle: 60,
+        spread: 65,
+        origin: { x: 0.05, y: 0.75 },
+        colors,
+      });
+
+      confetti({
+        particleCount: 75,
+        angle: 120,
+        spread: 65,
+        origin: { x: 0.95, y: 0.75 },
+        colors,
+      });
+
+      // Cannon 3: Center starburst pop
+      const timer1 = setTimeout(() => {
+        confetti({
+          particleCount: 110,
+          spread: 100,
+          origin: { x: 0.5, y: 0.35 },
+          colors,
+          startVelocity: 42,
+          scalar: 1.15,
+        });
+      }, 250);
+
+      // Cannon 4: Multi-color cascade rain
+      const timer2 = setTimeout(() => {
+        confetti({
+          particleCount: 80,
+          angle: 90,
+          spread: 130,
+          origin: { x: 0.5, y: 0.6 },
+          colors,
+          startVelocity: 35,
+        });
+      }, 600);
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    } catch {
+      // Confetti fallback
+    }
+  }, []);
+
+  // Only one advisor (Asset Allocation or Debt Repayment) can be open at a time
+  const [openAdvisor, setOpenAdvisor] = useState<'none' | 'asset' | 'debt'>('none');
 
   // Track hidden goals (both locally and synced with assessment)
   const [hiddenGoalIds, setHiddenGoalIds] = useState<Set<string>>(() => {
@@ -120,8 +191,17 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
   const p = pillarScores;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 pb-16">
-      {/* Top Banner / Actions Bar */}
+    <>
+      {/* EXECUTIVE 3-PAGE PRINT TEMPLATE: RENDERED ONLY IN PDF/PRINT */}
+      <ScoreReportPrint
+        assessment={assessment}
+        scoreResult={scoreResult}
+        hiddenGoalIds={hiddenGoalIds}
+      />
+
+      {/* INTERACTIVE ON-SCREEN DASHBOARD: HIDDEN IN PDF/PRINT */}
+      <div className="space-y-8 animate-in fade-in duration-300 pb-16 print:hidden">
+        {/* Top Banner / Actions Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-2xs">
         <div className="flex items-center gap-3.5">
           <img
@@ -336,8 +416,8 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
               p.debtHealth.totalMonthlyEmi === 0
                 ? ['Excellent! You are completely debt-free. Keep credit card balances cleared monthly.']
                 : p.debtHealth.highInterestDebt > 0
-                ? [`Focus on clearing ${formatCurrency(p.debtHealth.highInterestDebt, curr)} in high-interest debt using debt avalanche.`]
-                : ['Maintain regular EMI payments on time to strengthen your credit profile.']
+                  ? [`Focus on clearing ${formatCurrency(p.debtHealth.highInterestDebt, curr)} in high-interest debt using debt avalanche.`]
+                  : ['Maintain regular EMI payments on time to strengthen your credit profile.']
             }
           />
         </div>
@@ -422,7 +502,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                   {metrics.goalsAnalysis.map((g) => {
                     const isHidden = hiddenGoalIds.has(g.goalId);
                     return (
-                      <tr 
+                      <tr
                         key={g.goalId}
                         className={`transition-colors ${isHidden ? 'bg-zinc-50/70 opacity-60' : 'hover:bg-zinc-50/40'}`}
                       >
@@ -465,11 +545,10 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                           <button
                             type="button"
                             onClick={() => toggleGoalHide(g.goalId)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border shadow-2xs ${
-                              isHidden
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border shadow-2xs ${isHidden
                                 ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
                                 : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-zinc-300'
-                            }`}
+                              }`}
                             title={isHidden ? 'Click to unhide goal and calculate in total' : 'Click to hide goal and exclude from calculation'}
                           >
                             {isHidden ? (
@@ -530,11 +609,25 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
         );
       })()}
 
-      {/* Asset Allocation Component Plan: Your Age-Based Allocation Strategy (Closed by default, click to show) */}
-      <AssetAllocationAdvisor assessment={assessment} scoreResult={scoreResult} />
+      {/* Asset Allocation Component Plan: Your Age-Based Allocation Strategy (Only one open at a time) */}
+      <AssetAllocationAdvisor
+        assessment={assessment}
+        scoreResult={scoreResult}
+        isOpen={openAdvisor === 'asset'}
+        onToggleOpen={(open) => setOpenAdvisor(open ? 'asset' : 'none')}
+      />
 
-      {/* Bottom Sticky Retake Banner */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-100 border border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Debt Management & Loan Repayment Strategies: 10 Strategies, 5 Calculators, Interactive Planner (Only one open at a time) */}
+      <DebtRepaymentAdvisor
+        assessment={assessment}
+        scoreResult={scoreResult}
+        onUpdateAssessment={onUpdateAssessment}
+        isOpen={openAdvisor === 'debt'}
+        onToggleOpen={(open) => setOpenAdvisor(open ? 'debt' : 'none')}
+      />
+
+      {/* Bottom Sticky Retake Banner: Hidden in PDF print */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-100 border border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
         <div>
           <h4 className="text-xs sm:text-sm font-bold text-zinc-900">Want to simulate changes or update numbers?</h4>
           <p className="text-xs text-zinc-500">You can return to any step of the assessment to test scenarios (e.g. paying off a loan or increasing monthly savings).</p>
@@ -557,5 +650,6 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
         </div>
       </div>
     </div>
-  );
+  </>
+);
 };

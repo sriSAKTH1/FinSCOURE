@@ -13,13 +13,15 @@ interface Step6Props {
 }
 
 const ASSET_CATEGORIES: { id: AssetCategory; label: string; badgeColor: string }[] = [
-  { id: 'stocks_mf', label: 'Stocks & Mutual Funds', badgeColor: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { id: 'stocks', label: 'Stocks (Direct Equity)', badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  { id: 'mf', label: 'Mutual Funds (MF / SIP)', badgeColor: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { id: 'gold', label: 'Gold / Other', badgeColor: 'bg-amber-50 text-amber-800 border-amber-200' },
   { id: 'fixed_deposits', label: 'Fixed & Recurring Deposits', badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
   { id: 'epf_ppf_nps', label: 'EPF, PPF, NPS & Pension', badgeColor: 'bg-teal-50 text-teal-800 border-teal-200' },
-  { id: 'gold', label: 'Physical & Sovereign Gold', badgeColor: 'bg-amber-50 text-amber-800 border-amber-200' },
   { id: 'real_estate', label: 'Real Estate / Land', badgeColor: 'bg-purple-50 text-purple-800 border-purple-200' },
   { id: 'cash_bank', label: 'Cash & Savings Balances', badgeColor: 'bg-zinc-100 text-zinc-800 border-zinc-200' },
   { id: 'crypto_alt', label: 'Cryptocurrency & Alternatives', badgeColor: 'bg-rose-50 text-rose-800 border-rose-200' },
+  { id: 'other', label: 'Other Assets', badgeColor: 'bg-slate-100 text-slate-800 border-slate-200' },
 ];
 
 export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
@@ -29,7 +31,7 @@ export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
   const addAsset = (presetCategory?: AssetCategory) => {
     const newAsset: AssetItem = {
       id: `asset-${Date.now()}`,
-      category: presetCategory || 'stocks_mf',
+      category: presetCategory || 'stocks',
       name: '',
       currentValue: '',
       monthlyContribution: '',
@@ -80,7 +82,7 @@ export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
           </div>
           <button
             type="button"
-            onClick={() => addAsset('stocks_mf')}
+            onClick={() => addAsset('stocks')}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#1b4d3e] border border-emerald-200 transition-all cursor-pointer shadow-2xs shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -114,11 +116,11 @@ export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
             <Coins className="w-10 h-10 text-zinc-300 mx-auto" />
             <h4 className="text-sm font-bold text-zinc-800">No assets recorded yet</h4>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              Adding mutual funds, stocks, PF/EPF, deposits, or gold helps calculate your total net worth and long-term compounding.
+              Adding stocks, mutual funds, gold, PF/EPF, deposits, or real estate helps calculate your total net worth and long-term compounding.
             </p>
             <button
               type="button"
-              onClick={() => addAsset('stocks_mf')}
+              onClick={() => addAsset('stocks')}
               className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-[#1b4d3e] text-white hover:bg-[#143d31] transition-all cursor-pointer shadow-2xs"
             >
               <Plus className="w-4 h-4" /> Add First Asset
@@ -127,7 +129,11 @@ export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
         ) : (
           <div className="space-y-4">
             {assets.map((asset, idx) => {
-              const categoryMeta = ASSET_CATEGORIES.find((c) => c.id === asset.category) || ASSET_CATEGORIES[0];
+              const categoryMeta =
+                ASSET_CATEGORIES.find((c) => c.id === asset.category) ||
+                (asset.category === 'stocks_mf'
+                  ? { id: 'stocks_mf', label: 'Stocks & Mutual Funds', badgeColor: 'bg-blue-50 text-blue-800 border-blue-200' }
+                  : ASSET_CATEGORIES[0]);
 
               return (
                 <div
@@ -175,7 +181,15 @@ export const Step6Assets: React.FC<Step6Props> = ({ data, onChange }) => {
                         type="text"
                         value={asset.name}
                         onChange={(e) => updateAsset(asset.id, 'name', e.target.value)}
-                        placeholder="e.g. S&P 500 Index / HDFC SIP"
+                        placeholder={
+                          asset.category === 'stocks'
+                            ? 'e.g. Reliance, TCS, HDFC Bank'
+                            : asset.category === 'mf'
+                            ? 'e.g. Parag Parikh Flexi Cap, Nifty 50 Index'
+                            : asset.category === 'gold'
+                            ? 'e.g. Sovereign Gold Bonds (SGB), 24K Gold'
+                            : 'e.g. Asset name or account'
+                        }
                         className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-[#1b4d3e] focus:outline-none"
                       />
                     </div>

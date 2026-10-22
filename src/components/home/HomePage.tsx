@@ -1,18 +1,18 @@
 'use client';
 
 import React from 'react';
-import { 
-  ArrowRight, 
-  ShieldCheck, 
-  Sparkles, 
-  TrendingUp, 
-  PiggyBank, 
-  CreditCard, 
-  CheckCircle2, 
-  Coins, 
-  Target, 
-  Receipt, 
-  Layers 
+import {
+  ArrowRight,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  PiggyBank,
+  CreditCard,
+  CheckCircle2,
+  Coins,
+  Target,
+  Receipt,
+  Layers
 } from 'lucide-react';
 import { CalculatorsHub } from './CalculatorsHub';
 import { CalculatorId } from '@/components/calculators/CalculatorsPage';
@@ -66,7 +66,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         {/* HERO TYPOGRAPHY COMPOSITION */}
         <div className="w-full max-w-6xl mx-auto flex flex-col items-center gap-1 sm:gap-3">
-          
+
           {/* ROW 1: "Fix your" + 3D Wallet Badge + Pill Widget */}
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <span className="text-5xl sm:text-7xl lg:text-8xl font-black text-zinc-950 tracking-tight">

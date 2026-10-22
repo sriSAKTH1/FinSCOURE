@@ -22,7 +22,7 @@ function convertUnderThousand(n: number): string {
 /**
  * Converts a number to Indian numbering words (Crore, Lakh, Thousand)
  */
-function toIndianWords(num: number): string {
+export function toIndianWords(num: number): string {
   if (num === 0) return 'Zero';
   let n = Math.floor(num);
   let words = '';
@@ -178,35 +178,53 @@ export function getCompactNotation(num: number, currency: CurrencyCode = 'INR'):
   return String(num);
 }
 
-export function formatPriceWithWords(amount: number | string | '' | undefined | null, currency: CurrencyCode = 'INR'): string {
-  const currencyUnit = currency === 'INR' ? 'Rupees' : currency === 'EUR' ? 'Euros' : currency === 'GBP' ? 'Pounds' : 'Dollars';
-  const symbol = currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+export interface PriceHighlight {
+  compact: string; // e.g. "100", "1k", "1L", "1Cr", "2.5L", "1.5Cr"
+  formatted: string; // e.g. "₹1,00,000"
+  words: string; // e.g. "One Lakh Rupees"
+  rawAmount: number;
+}
 
+export function getPriceHighlight(
+  amount: number | string | '' | undefined | null,
+  currency: CurrencyCode = 'INR'
+): PriceHighlight | null {
+  if (amount === '' || amount === undefined || amount === null) return null;
+  const num = typeof amount === 'number' ? amount : parseShorthandAmount(amount);
+  if (num === '' || isNaN(Number(num))) return null;
+  const n = Number(num);
+  if (n <= 0) return null;
+
+  const compact = getCompactNotation(n, 'INR');
+  const formatted = `₹${Math.round(n).toLocaleString('en-IN')}`;
+  const words = `${toIndianWords(n)} Rupees`;
+
+  return {
+    compact,
+    formatted,
+    words,
+    rawAmount: n,
+  };
+}
+
+export function formatPriceWithWords(amount: number | string | '' | undefined | null, currency: CurrencyCode = 'INR'): string {
   if (amount === '' || amount === undefined || amount === null) {
-    return `${symbol}0 • Zero (Zero ${currencyUnit})`;
+    return '';
   }
 
   const num = typeof amount === 'number' ? amount : parseShorthandAmount(amount);
   if (num === '' || isNaN(Number(num))) {
-    return `${symbol}0 • Zero (Zero ${currencyUnit})`;
+    return '';
   }
 
   const n = Number(num);
-  if (n === 0) {
-    return `${symbol}0 • Zero (Zero ${currencyUnit})`;
+  if (n <= 0) {
+    return '';
   }
 
-  const compact = getCompactNotation(n, currency);
-  let formattedNum = '';
-  let words = '';
+  const compact = getCompactNotation(n, 'INR');
+  const formattedNum = `₹${Math.round(n).toLocaleString('en-IN')}`;
+  const words = toIndianWords(n);
 
-  if (currency === 'INR') {
-    formattedNum = `${symbol}${Math.round(n).toLocaleString('en-IN')}`;
-    words = toIndianWords(n);
-  } else {
-    formattedNum = `${symbol}${Math.round(n).toLocaleString('en-US')}`;
-    words = toInternationalWords(n);
-  }
-
-  return `${formattedNum} (${compact}) • ${words} ${currencyUnit}`;
+  return `${formattedNum} (${compact}) • ${words} Rupees`;
 }

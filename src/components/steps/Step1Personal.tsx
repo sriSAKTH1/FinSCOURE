@@ -69,23 +69,19 @@ export const Step1Personal: React.FC<Step1Props> = ({ data, onChange, showErrors
             />
           </div>
 
-          {/* Currency */}
+          {/* Currency (Locked to INR only) */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs sm:text-sm font-semibold text-zinc-800">
               Currency
             </label>
-            <div className="relative">
-              <select
-                value={personal.currency || 'INR'}
-                onChange={(e) => updatePersonal('currency', e.target.value as CurrencyCode)}
-                className="w-full appearance-none rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm sm:text-base font-medium text-zinc-900 focus:border-[#1b4d3e] focus:ring-3 focus:ring-[#1b4d3e]/10 focus:outline-none transition-all shadow-2xs pr-9 cursor-pointer"
-              >
-                <option value="INR">INR (₹)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="GBP">GBP (£)</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3.5 top-4 pointer-events-none" />
+            <div className="flex items-center gap-2.5 rounded-xl border border-[#c1e1d2] bg-[#eaf5ef]/70 px-4 py-3 text-sm sm:text-base font-bold text-[#1b4d3e] shadow-2xs select-none">
+              <span className="w-6 h-6 rounded-lg bg-[#1b4d3e] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                ₹
+              </span>
+              <span className="text-zinc-900 font-extrabold">INR</span>
+              <span className="text-xs font-semibold text-[#1b4d3e] bg-white px-2 py-0.5 rounded border border-[#b7dfcb]">
+                Indian Rupee (₹)
+              </span>
             </div>
           </div>
 
