@@ -23,19 +23,22 @@ export const Header: React.FC<HeaderProps> = ({ activePage = 'home', onNavigate 
   }
 
   return (
-    <div className="sticky top-0 z-50 pointer-events-none w-full print:hidden">
-      <div className="w-full pt-4 sm:pt-6 pb-2 flex items-center justify-start pl-6 sm:pl-8 md:pl-10 pr-4">
-        <div
-          onClick={() => onNavigate('home')}
-          className="pointer-events-auto flex items-center cursor-pointer group select-none shrink-0"
-          title="FinScore — Fix your finances with me!"
-        >
-          <img
-            src="/logo.png"
-            alt="FinScore — Fix Your Finance With Me!"
-            className="h-12 sm:h-14 md:h-16 w-auto object-contain hover:opacity-90 transition-opacity drop-shadow-xs"
-          />
-        </div>
+    <div className="fixed top-3 left-4 sm:top-4 sm:left-6 md:left-8 z-50 print:hidden pointer-events-auto">
+      <div
+        onClick={() => {
+          onNavigate('home');
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
+        className="flex items-center cursor-pointer group select-none shrink-0 bg-transparent border-none shadow-none p-0 transition-transform duration-300 hover:scale-105 active:scale-95"
+        title="FinScore — Fix your finances with me!"
+      >
+        <img
+          src="/logo.png"
+          alt="FinScore — Fix Your Finance With Me!"
+          className="h-8 sm:h-10 md:h-11 w-auto object-contain transition-opacity group-hover:opacity-90 drop-shadow-xs"
+        />
       </div>
     </div>
   );

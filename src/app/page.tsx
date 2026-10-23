@@ -330,7 +330,7 @@ export default function App() {
       />
 
       {/* MAIN CANVAS */}
-      <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-3 sm:py-5">
+      <main className={`flex-1 w-full px-3 sm:px-6 lg:px-8 ${activePage === 'home' ? 'pt-0 pb-6 sm:pb-10' : 'py-3 sm:py-5'}`}>
 
         {/* PAGE 1: HOME PAGE */}
         {activePage === 'home' && (

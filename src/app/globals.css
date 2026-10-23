@@ -3,6 +3,7 @@
 @layer base {
   :root {
     --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-hero: 'Outfit', 'Fredoka', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   body {
@@ -13,6 +14,11 @@
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+}
+
+.font-hero {
+  font-family: var(--font-hero);
+  letter-spacing: -0.025em;
 }
 
 /* ========================================================
@@ -224,6 +230,100 @@ body[data-theme="light-blue"] {
 
 .animate-float-slow {
   animation: floatSlow 3.5s ease-in-out infinite;
+}
+
+@keyframes heroArtFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-hero-art {
+  animation: heroArtFloat 5s ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+@keyframes heroFloatReverse {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(7px) rotate(-1.5deg);
+  }
+}
+
+@keyframes heroSparkle {
+  0%, 100% {
+    transform: scale(0.9) rotate(0deg);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.18) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+@keyframes heroDashFlow {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes heroPulseGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+.animate-hero-float {
+  animation: heroFloat 4.2s ease-in-out infinite;
+}
+
+.animate-hero-float-reverse {
+  animation: heroFloatReverse 4.8s ease-in-out infinite;
+}
+
+.animate-hero-sparkle {
+  animation: heroSparkle 3s ease-in-out infinite;
+}
+
+.animate-hero-dash {
+  stroke-dasharray: 6 6;
+  animation: heroDashFlow 2.4s linear infinite;
+}
+
+.animate-hero-pulse-glow {
+  animation: heroPulseGlow 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-art,
+  .animate-hero-float,
+  .animate-hero-float-reverse,
+  .animate-hero-sparkle,
+  .animate-hero-dash,
+  .animate-hero-pulse-glow {
+    animation: none !important;
+  }
 }
 
 .hazard-stripes {
