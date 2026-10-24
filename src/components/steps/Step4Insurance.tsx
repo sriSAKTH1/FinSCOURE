@@ -116,10 +116,14 @@ export const Step4Insurance: React.FC<Step4Props> = ({ data, onChange }) => {
                   onChange={(e) => updateHealth('source', e.target.value)}
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-[#1b4d3e] focus:outline-none"
                 >
-                  <option value="employer">Employer / Corporate Provided</option>
-                  <option value="retail">Personal / Retail Policy</option>
-                  <option value="both">Both Employer & Personal</option>
+                  <option value="employer">Corporate Insurance (5 Marks)</option>
+                  <option value="retail">Personal Insurance (Full 15 Marks)</option>
+                  <option value="both">Both Corporate & Personal (Full 15 Marks)</option>
                 </select>
+                <span className="text-[11px] text-zinc-500">
+                  {healthInsurance.source === 'employer' && 'Corporate insurance only qualifies for 5 marks as it ends with employment.'}
+                  {(healthInsurance.source === 'retail' || healthInsurance.source === 'both') && 'Personal cover guarantees permanent protection and earns full marks.'}
+                </span>
               </div>
 
               <CurrencyInput

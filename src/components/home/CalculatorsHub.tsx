@@ -41,8 +41,22 @@ interface CalculatorCardInfo {
 
 const CALCULATORS_LIST: CalculatorCardInfo[] = [
   {
-    id: 'sip',
+    id: 'normal',
     number: '01',
+    name: 'Normal Calculator',
+    subtitle: 'Standard & Financial Math',
+    badge: 'Standard & GST',
+    badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Fast daily math calculations with interactive tape history, memory keys, Indian denomination formats, and 1-click GST tax presets.',
+    iconBg: 'bg-emerald-50 text-[#1b4d3e]',
+    iconColor: 'text-[#1b4d3e]',
+    icon: <Calculator className="w-5 h-5" />,
+    exampleHighlight: 'Keyboard friendly + GST & Indian Lakh/Crore conversions',
+    formulaSnippet: 'Standard Arithmetic & Memory (MC, MR, M+, M-)',
+  },
+  {
+    id: 'sip',
+    number: '02',
     name: 'SIP Calculator',
     subtitle: 'Systematic Investment Plan',
     badge: 'Wealth Builder',

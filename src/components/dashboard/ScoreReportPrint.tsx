@@ -517,6 +517,7 @@ export const ScoreReportPrint: React.FC<ScoreReportPrintProps> = ({
                       <th className="py-1.5 px-2.5">Year</th>
                       <th className="py-1.5 px-2.5">Required /mo</th>
                       <th className="py-1.5 px-2.5">Current /mo</th>
+                      <th className="py-1.5 px-2.5 text-center">Score</th>
                       <th className="py-1.5 px-2.5 text-center">Status</th>
                     </tr>
                   </thead>
@@ -528,6 +529,9 @@ export const ScoreReportPrint: React.FC<ScoreReportPrintProps> = ({
                         <td className="py-1.5 px-2.5 text-zinc-600">{g.targetYear} ({g.yearsRemaining}y)</td>
                         <td className="py-1.5 px-2.5 font-bold text-[#1b4d3e]">{formatCurrency(g.monthlyRequired, curr)}/mo</td>
                         <td className="py-1.5 px-2.5 text-zinc-700">{formatCurrency(g.currentMonthlyContribution, curr)}/mo</td>
+                        <td className="py-1.5 px-2.5 text-center font-bold">
+                          {g.score}/100
+                        </td>
                         <td className="py-1.5 px-2.5 text-center">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${g.onTrack ? 'bg-[#eaf5ef] text-[#1b4d3e] border border-[#b7dfcb]' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
                             {g.onTrack ? 'On track' : 'Underfunded'}

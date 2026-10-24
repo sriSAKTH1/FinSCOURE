@@ -494,6 +494,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                     <th className="py-2.5">Target Year</th>
                     <th className="py-2.5">Required /mo</th>
                     <th className="py-2.5">Current /mo</th>
+                    <th className="py-2.5">Goal Score</th>
                     <th className="py-2.5">Status</th>
                     <th className="py-2.5 text-center">Hide / Unhide</th>
                   </tr>
@@ -529,6 +530,21 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                         </td>
                         <td className={`py-3 ${isHidden ? 'line-through text-zinc-400' : 'text-zinc-700'}`}>
                           {formatCurrency(g.currentMonthlyContribution, curr)}/mo
+                        </td>
+                        <td className="py-3">
+                          {isHidden ? (
+                            <span className="text-zinc-400 font-bold text-xs">—</span>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-md font-black text-xs ${
+                              g.score === 0 
+                                ? 'bg-rose-50 text-rose-800 border border-rose-200' 
+                                : g.score >= 80 
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+                            }`}>
+                              {g.score}/100 {g.score === 0 ? '(0 Marks)' : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3">
                           {isHidden ? (

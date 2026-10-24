@@ -41,21 +41,19 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
     const savingsScore = Math.min(100, Math.max(0, Math.round((pillarScores.savingsHealth.score / 25) * 100)));
     const insuranceScore = Math.min(100, Math.max(0, Math.round((pillarScores.insuranceProtection.score / 25) * 100)));
     
-    // Future Goals spoke
-    let goalsScore = 65;
+    // Future Goals spoke (Strict 100-mark calculation based on actual savings and monthly contribution)
+    let goalsScore = 0;
     if (metrics.goalsAnalysis && metrics.goalsAnalysis.length > 0) {
       const activeGoals = metrics.goalsAnalysis.filter(g => !g.hidden);
       if (activeGoals.length > 0) {
-        const onTrackCount = activeGoals.filter(g => g.onTrack).length;
-        const onTrackRatio = onTrackCount / activeGoals.length;
-        goalsScore = Math.min(100, Math.max(30, Math.round(onTrackRatio * 85 + 15)));
+        // Average of individual active goal scores (0 - 100 marks each)
+        const totalScore = activeGoals.reduce((sum, g) => sum + (g.score ?? 0), 0);
+        goalsScore = Math.round(totalScore / activeGoals.length);
       } else {
-        goalsScore = 70;
+        goalsScore = 0;
       }
-    } else if (assessment.assets.length > 0) {
-      goalsScore = 70;
     } else {
-      goalsScore = 55;
+      goalsScore = 0;
     }
 
     const spokes = [
@@ -458,7 +456,9 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
                 {radarData.weakest.label} ({radarData.weakest.value}/100)
               </div>
               <p className="text-xs text-zinc-500">
-                Addressing this spoke offers the fastest score gain and greatest long-term stability.
+                {radarData.weakest.key === 'goals' && radarData.weakest.value === 0
+                  ? 'Your future goal currently has zero saved corpus and ₹0/mo contribution (0/100 marks). Allocate monthly surplus or start an investment plan to start scoring.'
+                  : 'Addressing this spoke offers the fastest score gain and greatest long-term stability.'}
               </p>
             </div>
 

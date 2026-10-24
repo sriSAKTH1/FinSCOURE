@@ -45,7 +45,7 @@ const THEME_STORAGE_KEY = 'finscore_active_theme';
 
 export default function App() {
   const [activePage, setActivePage] = useState<ActivePage>('home');
-  const [activeCalculatorId, setActiveCalculatorId] = useState<CalculatorId>('sip');
+  const [activeCalculatorId, setActiveCalculatorId] = useState<CalculatorId>('normal');
   const [theme, setTheme] = useState<AppTheme>('normal');
   const [assessment, setAssessment] = useState<AssessmentData>(DEFAULT_ASSESSMENT);
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -516,7 +516,7 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-zinc-600">
             <button type="button" onClick={() => { navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Home</button>
-            <button type="button" onClick={() => { navigateTo('calculators', { calcId: 'sip' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Calculators</button>
+            <button type="button" onClick={() => { navigateTo('calculators', { calcId: 'normal' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Calculators</button>
             <button type="button" onClick={() => { navigateTo('assessment'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Assessment</button>
             <button type="button" onClick={() => { navigateTo('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-black cursor-pointer">Score Dashboard</button>
           </div>

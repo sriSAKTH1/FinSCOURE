@@ -27,11 +27,14 @@ import {
   RefreshCw,
   Table,
   TrendingDown,
-  Flame
+  Flame,
+  Calculator
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/calculations';
+import { StandardCalculator } from './StandardCalculator';
 
 export type CalculatorId = 
+  | 'normal'
   | 'sip' 
   | 'inflation'
   | 'stepup' 
@@ -81,34 +84,117 @@ export function formatYAxisAmount(num: number): string {
   return `₹${Math.round(num)}`;
 }
 
-// Newton-Raphson XIRR solver
+// Financial-grade XIRR solver (matching Microsoft Excel / Google Sheets XIRR standard)
 function calculateXIRR(cashFlows: { amount: number; date: Date }[], guess = 0.12): number {
   if (cashFlows.length < 2) return 0;
-  const minDate = cashFlows[0].date.getTime();
+
+  // Filter non-zero entries
+  const validFlows = cashFlows.filter(cf => cf.amount !== 0 && !isNaN(cf.amount));
+  if (validFlows.length < 2) return 0;
+
+  const hasNegative = validFlows.some(cf => cf.amount < 0);
+  const hasPositive = validFlows.some(cf => cf.amount > 0);
+  if (!hasNegative || !hasPositive) return 0;
+
+  // 1. Sort in strict ascending chronological order
+  const sorted = [...validFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const d0 = sorted[0].date.getTime();
+  const msPerDay = 24 * 3600 * 1000;
+
+  // Daycount standard: Excel uses 365.0 days/year
+  const times = sorted.map(cf => (cf.date.getTime() - d0) / (365.0 * msPerDay));
+  const amounts = sorted.map(cf => cf.amount);
+
+  // NPV function: sum(C_i / (1 + r)^t_i)
+  const npv = (r: number): number => {
+    let sum = 0;
+    for (let i = 0; i < amounts.length; i++) {
+      const den = Math.pow(1 + r, times[i]);
+      if (den === 0 || isNaN(den) || !isFinite(den)) return Infinity;
+      sum += amounts[i] / den;
+    }
+    return sum;
+  };
+
+  // Derivative dNPV/dr: sum(-t_i * C_i / ((1 + r)^(t_i + 1)))
+  const dnpv = (r: number): number => {
+    let sum = 0;
+    for (let i = 0; i < amounts.length; i++) {
+      const t = times[i];
+      const den = Math.pow(1 + r, t) * (1 + r);
+      if (den === 0 || isNaN(den) || !isFinite(den)) return 0;
+      sum -= (t * amounts[i]) / den;
+    }
+    return sum;
+  };
+
+  // 2. Multi-guess Newton-Raphson with bounded stepping
+  const guessList = [guess, 0.1, 0.2, 0.05, -0.05, 0.5, -0.2, -0.5, 1.0, 0.0];
   const maxIterations = 100;
-  const tol = 1e-6;
-  let rate = guess;
+  const tol = 1e-7;
 
-  for (let i = 0; i < maxIterations; i++) {
-    let fValue = 0;
-    let fDerivative = 0;
+  for (const g of guessList) {
+    let rate = g;
+    let converged = false;
 
-    for (const cf of cashFlows) {
-      const years = (cf.date.getTime() - minDate) / (365.25 * 24 * 3600 * 1000);
-      const factor = Math.pow(1 + rate, years);
-      if (factor === 0 || isNaN(factor)) return 0;
-      fValue += cf.amount / factor;
-      fDerivative -= (years * cf.amount) / (factor * (1 + rate));
+    for (let i = 0; i < maxIterations; i++) {
+      if (rate <= -0.999) {
+        rate = -0.999;
+      }
+
+      const fValue = npv(rate);
+      const fDerivative = dnpv(rate);
+
+      if (!Number.isFinite(fValue) || !Number.isFinite(fDerivative) || Math.abs(fDerivative) < 1e-12) {
+        break;
+      }
+
+      const step = fValue / fDerivative;
+      let newRate = rate - step;
+
+      // Damp step if it shoots below -0.999
+      if (newRate <= -0.999) {
+        newRate = (rate - 0.999) / 2;
+      }
+
+      if (Math.abs(newRate - rate) < tol) {
+        rate = newRate;
+        converged = true;
+        break;
+      }
+      rate = newRate;
     }
 
-    if (Math.abs(fDerivative) < 1e-9) break;
-    const newRate = rate - fValue / fDerivative;
-    if (Math.abs(newRate - rate) < tol) {
-      return Number.isFinite(newRate) ? Math.round(newRate * 1000) / 10 : 0;
+    if (converged && Number.isFinite(rate) && rate > -0.999) {
+      // Return 2 decimal places precision (e.g. 17.86% instead of 17.9%)
+      return Math.round(rate * 10000) / 100;
     }
-    rate = newRate;
   }
-  return Number.isFinite(rate) ? Math.round(rate * 1000) / 10 : 0;
+
+  // 3. Robust Bisection fallback for difficult cash flow curves
+  let low = -0.99;
+  let high = 10.0;
+  let fLow = npv(low);
+  let fHigh = npv(high);
+
+  if (fLow * fHigh <= 0) {
+    for (let i = 0; i < 100; i++) {
+      const mid = (low + high) / 2;
+      const fMid = npv(mid);
+      if (Math.abs(fMid) < 1e-6 || (high - low) < tol) {
+        return Math.round(mid * 10000) / 100;
+      }
+      if (fLow * fMid < 0) {
+        high = mid;
+        fHigh = fMid;
+      } else {
+        low = mid;
+        fLow = fMid;
+      }
+    }
+  }
+
+  return 0;
 }
 
 interface XirrTransaction {
@@ -126,7 +212,7 @@ const DEFAULT_XIRR_TRANSACTIONS: XirrTransaction[] = [
 ];
 
 export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
-  initialCalculator = 'sip',
+  initialCalculator = 'normal',
   onBackToHome,
   onStartAssessment,
 }) => {
@@ -278,6 +364,66 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
 
   // 4. XIRR STATE (DYNAMIC ADD CASH IN & OUT)
   const [xirrTransactions, setXirrTransactions] = useState<XirrTransaction[]>(DEFAULT_XIRR_TRANSACTIONS);
+  const [xirrPresetAmount, setXirrPresetAmount] = useState<number>(10000);
+  const [xirrIntervalMonths, setXirrIntervalMonths] = useState<number>(1);
+  const [xirrRepeatCount, setXirrRepeatCount] = useState<number>(2);
+
+  const handleAddScheduledXirr = (type: 'invest' | 'withdraw') => {
+    // Check if current list only has the 0-amount reset placeholders
+    const hasOnlyZeroResetEntries = xirrTransactions.length === 2 && xirrTransactions.every(t => t.amount === 0);
+
+    let baseDate = new Date();
+    if (!hasOnlyZeroResetEntries && xirrTransactions.length > 0) {
+      const lastTx = xirrTransactions[xirrTransactions.length - 1];
+      if (lastTx && lastTx.dateStr) {
+        baseDate = new Date(lastTx.dateStr);
+      }
+    }
+
+    const interval = Math.max(0.5, xirrIntervalMonths || 1);
+    const count = Math.max(1, xirrRepeatCount || 1);
+    const newTxs: XirrTransaction[] = [];
+
+    for (let i = 1; i <= count; i++) {
+      const txDate = new Date(baseDate);
+      if (interval === 0.5) {
+        // Half month (~15 days)
+        txDate.setDate(txDate.getDate() + (15 * i));
+      } else {
+        const wholeMonths = Math.floor(interval * i);
+        const rem = (interval * i) - wholeMonths;
+        txDate.setMonth(txDate.getMonth() + wholeMonths);
+        if (rem > 0) {
+          txDate.setDate(txDate.getDate() + Math.round(rem * 30));
+        }
+      }
+
+      newTxs.push({
+        id: String(Date.now() + Math.random() + i),
+        amount: xirrPresetAmount > 0 ? xirrPresetAmount : (type === 'invest' ? 10000 : 25000),
+        dateStr: txDate.toISOString().slice(0, 10),
+        type,
+      });
+    }
+
+    if (hasOnlyZeroResetEntries) {
+      if (type === 'invest') {
+        const lastDate = new Date(newTxs[newTxs.length - 1].dateStr);
+        lastDate.setMonth(lastDate.getMonth() + Math.max(1, Math.round(interval)));
+        setXirrTransactions([
+          ...newTxs,
+          { id: 'reset-inflow-auto', amount: 0, dateStr: lastDate.toISOString().slice(0, 10), type: 'withdraw' }
+        ]);
+      } else {
+        setXirrTransactions([
+          { id: 'reset-outflow-auto', amount: 0, dateStr: baseDate.toISOString().slice(0, 10), type: 'invest' },
+          ...newTxs
+        ]);
+      }
+    } else {
+      setXirrTransactions(prev => [...prev, ...newTxs]);
+    }
+  };
 
   const handleAddXirrTransaction = (type: 'invest' | 'withdraw') => {
     const lastTx = xirrTransactions[xirrTransactions.length - 1];
@@ -289,7 +435,7 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
     }
     const newTx: XirrTransaction = {
       id: String(Date.now() + Math.random()),
-      amount: type === 'invest' ? 10000 : 25000,
+      amount: xirrPresetAmount > 0 ? xirrPresetAmount : (type === 'invest' ? 10000 : 25000),
       dateStr: nextDateStr,
       type,
     };
@@ -308,12 +454,22 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
     setXirrTransactions(prev => prev.filter(tx => tx.id !== id));
   };
 
+  // Reset to clear older data: only 1 cash out and 1 cash in with an amount of 0
   const handleResetXirr = () => {
-    setXirrTransactions(DEFAULT_XIRR_TRANSACTIONS);
+    const today = new Date().toISOString().slice(0, 10);
+    const nextDate = new Date();
+    nextDate.setFullYear(nextDate.getFullYear() + 1);
+    const nextYearStr = nextDate.toISOString().slice(0, 10);
+
+    setXirrTransactions([
+      { id: 'reset-out-1', amount: 0, dateStr: today, type: 'invest' },
+      { id: 'reset-in-2', amount: 0, dateStr: nextYearStr, type: 'withdraw' }
+    ]);
   };
 
   const xirrData = useMemo(() => {
-    const cashFlows = xirrTransactions.map(t => ({
+    const validFlows = xirrTransactions.filter(t => t.amount > 0);
+    const cashFlows = validFlows.map(t => ({
       amount: t.type === 'invest' ? -Math.abs(t.amount) : Math.abs(t.amount),
       date: new Date(t.dateStr),
     }));
@@ -327,7 +483,9 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
       .reduce((acc, t) => acc + t.amount, 0);
 
     const netProfit = finalVal - totalInvested;
-    const xirrRate = calculateXIRR(cashFlows, 0.12);
+    const xirrRate = totalInvested > 0 && finalVal > 0 && cashFlows.length >= 2
+      ? calculateXIRR(cashFlows, 0.12)
+      : 0;
 
     return { totalInvested, finalVal, netProfit, xirrRate };
   }, [xirrTransactions]);
@@ -524,6 +682,7 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
 
   // Tab Definitions matching user screenshot style
   const calculatorTabs: { id: CalculatorId; label: string; badge?: string; icon: React.ReactNode }[] = [
+    { id: 'normal', label: 'Normal Calculator', badge: 'Standard', icon: <Calculator className="w-4 h-4 text-emerald-700" /> },
     { id: 'sip', label: 'SIP Calculator', icon: <TrendingUp className="w-4 h-4 text-emerald-600" /> },
     { id: 'inflation', label: 'Inflation', badge: '🔥 Cost of Living', icon: <Flame className="w-4 h-4 text-rose-600" /> },
     { id: 'stepup', label: 'Step-Up SIP', badge: '📈 2x', icon: <ArrowUpRight className="w-4 h-4 text-teal-600" /> },
@@ -851,7 +1010,10 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
         </div>
       </div>
 
-      {/* 2-COLUMN MAIN WORKSPACE */}
+      {/* MAIN WORKSPACE: NORMAL CALCULATOR OR 2-COLUMN FINANCIAL CALCULATOR */}
+      {activeTab === 'normal' ? (
+        <StandardCalculator />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* ========================================================
@@ -1181,35 +1343,232 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
                     </label>
                     <p className="text-[11px] text-zinc-500">Add regular investments (outflow) & maturity redemptions (inflow)</p>
                   </div>
+                  {/* Reset Button: Clears all older data and sets only 1 cash out and 1 cash in with amount 0 */}
                   <button
                     type="button"
                     onClick={handleResetXirr}
-                    className="text-[11px] font-bold text-zinc-500 hover:text-black flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-rose-50 text-zinc-700 hover:text-rose-700 border border-zinc-200 hover:border-rose-200 flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                    title="Clear older data and start with 1 cash out and 1 cash in with amount 0"
                   >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Reset</span>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Reset (Clear to 0)</span>
                   </button>
                 </div>
 
-                {/* Quick Add Inflow / Outflow Buttons */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => handleAddXirrTransaction('invest')}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Cash Out (Invest -)</span>
-                  </button>
+                {/* RECURRING CASH FLOW PRESETS PANEL */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/90 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200/70">
+                    <div>
+                      <h4 className="text-xs font-black text-zinc-900 tracking-tight flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>RECURRING CASH FLOW PRESETS</span>
+                      </h4>
+                      <p className="text-[11px] text-zinc-500">Configure recurring amount, interval, and installments for outgoing/incoming</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Auto-Scheduler
+                    </span>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleAddXirrTransaction('withdraw')}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Cash In (Return +)</span>
-                  </button>
+                  {/* 1. GIVE THE AMOUNT */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-zinc-800">
+                        1. Amount (Outgoing / Incoming) (₹)
+                      </label>
+                      <span className="text-[11px] font-black text-indigo-700">
+                        {formatCurrency(xirrPresetAmount)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-zinc-400">₹</span>
+                      <input
+                        type="number"
+                        step="1000"
+                        min="500"
+                        value={xirrPresetAmount === 0 ? '' : xirrPresetAmount}
+                        onChange={(e) => setXirrPresetAmount(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                        className="w-full pl-8 pr-4 py-2 text-sm font-black text-zinc-900 rounded-xl border border-zinc-300 bg-white focus:border-indigo-600 focus:outline-none shadow-2xs"
+                        placeholder="Enter recurring amount"
+                      />
+                    </div>
+                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                      {[5000, 10000, 25000, 50000, 100000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setXirrPresetAmount(amt)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                            xirrPresetAmount === amt ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {formatCurrency(amt)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. CHOOSE INTERVAL & 3. CHOOSE INSTALLMENTS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    
+                    {/* 2. Choose the year or month (half month, 1 month, quarter, 12 months) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-zinc-700">
+                          2. Interval (Month / Year)
+                        </label>
+                        <span className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          {xirrIntervalMonths === 0.5 ? 'Half Month (15d)' : xirrIntervalMonths === 1 ? '1 Month' : xirrIntervalMonths === 3 ? 'Quarter (3m)' : xirrIntervalMonths === 6 ? 'Half-Year (6m)' : xirrIntervalMonths === 12 ? '1 Year (12m)' : `Every ${xirrIntervalMonths}m`}
+                        </span>
+                      </div>
+                      
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          max="60"
+                          value={xirrIntervalMonths === 0 ? '' : xirrIntervalMonths}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Math.max(0.5, parseFloat(e.target.value) || 0.5);
+                            setXirrIntervalMonths(val);
+                          }}
+                          className="w-full text-xs font-black text-zinc-900 px-3 py-2 rounded-xl border border-zinc-300 bg-white focus:border-indigo-600 focus:outline-none shadow-2xs"
+                          placeholder="e.g. 0.5 (half month), 1, 3, 12"
+                        />
+                      </div>
+
+                      {/* Quick chips for half-month, 1 month, quarter, 6m, 12m */}
+                      <div className="flex gap-1 flex-wrap">
+                        {[
+                          { label: 'Half Month', m: 0.5 },
+                          { label: '1 Month', m: 1 },
+                          { label: 'Quarter', m: 3 },
+                          { label: 'Half Year', m: 6 },
+                          { label: '12 Months (Year)', m: 12 },
+                        ].map(item => (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={() => setXirrIntervalMonths(item.m)}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                              xirrIntervalMonths === item.m
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. Choose how many installments (quarterly, every year, 6 times, 12 times, etc.) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-zinc-700">
+                          3. Installments Count
+                        </label>
+                        <span className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          {xirrRepeatCount} {xirrRepeatCount === 1 ? 'Installment' : 'Installments'}
+                        </span>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          max="120"
+                          value={xirrRepeatCount === 0 ? '' : xirrRepeatCount}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Math.max(1, parseInt(e.target.value) || 1);
+                            setXirrRepeatCount(val);
+                          }}
+                          className="w-full text-xs font-black text-zinc-900 px-3 py-2 rounded-xl border border-zinc-300 bg-white focus:border-indigo-600 focus:outline-none shadow-2xs"
+                          placeholder="e.g. 6, 12, 24 installments"
+                        />
+                      </div>
+
+                      {/* Quick chips for installments */}
+                      <div className="flex gap-1 flex-wrap">
+                        {[
+                          { label: 'Twice (2x)', c: 2 },
+                          { label: 'Thrice (3x)', c: 3 },
+                          { label: 'Quarterly (4x)', c: 4 },
+                          { label: '6 Times', c: 6 },
+                          { label: '12 Installments', c: 12 },
+                          { label: '24 Times', c: 24 },
+                        ].map(item => (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={() => setXirrRepeatCount(item.c)}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                              xirrRepeatCount === item.c
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Summary Preview */}
+                  <div className="p-2.5 rounded-xl bg-white border border-zinc-200 text-[11px] text-zinc-600 flex items-center justify-between">
+                    <span>Batch Plan:</span>
+                    <span className="font-black text-indigo-950">
+                      {xirrRepeatCount} Installments × {formatCurrency(xirrPresetAmount)} ({xirrIntervalMonths === 0.5 ? 'Every Half Month' : `Every ${xirrIntervalMonths} Month(s)`}) = {formatCurrency(xirrPresetAmount * xirrRepeatCount)} Total
+                    </span>
+                  </div>
+
+                  {/* ACTION BUTTONS: Outgoing & Incoming with same options */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {/* Outgoing Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddScheduledXirr('invest')}
+                      className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-black transition-all cursor-pointer shadow-2xs active:scale-98"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add {xirrRepeatCount}x Outgoing (Cash Out / Invest -)</span>
+                    </button>
+
+                    {/* Incoming Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddScheduledXirr('withdraw')}
+                      className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black transition-all cursor-pointer shadow-2xs active:scale-98"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add {xirrRepeatCount}x Incoming (Cash In / Return +)</span>
+                    </button>
+                  </div>
+
+                  {/* Option for single 1x quick add */}
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-zinc-200/60">
+                    <span>Quick single entries:</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAddXirrTransaction('invest')}
+                        className="text-rose-700 hover:underline font-bold cursor-pointer"
+                      >
+                        + 1x Single Invest (-)
+                      </button>
+                      <span>·</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddXirrTransaction('withdraw')}
+                        className="text-emerald-700 hover:underline font-bold cursor-pointer"
+                      >
+                        + 1x Single Inflow (+)
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Interactive Cash Flow Table */}
@@ -1599,8 +1958,8 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
                 {activeTab === 'nps' && `${formatIndianUnits(npsData.corpus)} Corpus`}
                 {activeTab === 'mis' && `₹${misData.monthlyIncome * 12}/year`}
                 {activeTab === 'emi' && `Total Loan Cost: ${formatIndianUnits(emiData.totalPayment)}`}
-                {activeTab === 'cagr' && `Total Profit: +${formatIndianUnits(cagrData.profit)}`}
-                {activeTab === 'xirr' && `Net Gain: +${formatIndianUnits(xirrData.netProfit)}`}
+                {activeTab === 'cagr' && (cagrData.profit >= 0 ? `Total Profit: +${formatIndianUnits(cagrData.profit)}` : `Total Loss: -${formatIndianUnits(Math.abs(cagrData.profit))}`)}
+                {activeTab === 'xirr' && (xirrData.netProfit >= 0 ? `Net Gain: +${formatIndianUnits(xirrData.netProfit)}` : `Net Loss: -${formatIndianUnits(Math.abs(xirrData.netProfit))}`)}
               </div>
             </div>
 
@@ -1629,15 +1988,19 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
               {/* Card 2: Estimated Returns / Interest / Extra Needed */}
               <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 space-y-1">
                 <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
-                  {activeTab === 'inflation' ? 'Extra Money Needed' : activeTab === 'emi' ? 'Total Interest' : activeTab === 'cagr' ? 'Net Profit' : activeTab === 'swp' ? 'Total Withdrawn' : activeTab === 'nps' ? 'Monthly Pension' : activeTab === 'mis' ? '5-Yr Total Interest' : 'Estimated Returns'}
+                  {activeTab === 'inflation' ? 'Extra Money Needed' : activeTab === 'emi' ? 'Total Interest' : activeTab === 'cagr' ? (cagrData.profit >= 0 ? 'Net Profit' : 'Net Loss') : activeTab === 'swp' ? 'Total Withdrawn' : activeTab === 'nps' ? 'Monthly Pension' : activeTab === 'mis' ? '5-Yr Total Interest' : (activeTab === 'xirr' && xirrData.netProfit < 0 ? 'Net Loss' : 'Estimated Returns')}
                 </span>
-                <div className="text-xl sm:text-2xl font-black text-emerald-700">
+                <div className={`text-xl sm:text-2xl font-black ${
+                  (activeTab === 'cagr' && cagrData.profit < 0) || (activeTab === 'xirr' && xirrData.netProfit < 0) 
+                    ? 'text-rose-600' 
+                    : 'text-emerald-700'
+                }`}>
                   {activeTab === 'sip' && `+${formatCurrency(sipData.totalReturns)}`}
                   {activeTab === 'inflation' && `+${formatCurrency(infData.costIncrease)}`}
                   {activeTab === 'stepup' && `+${formatCurrency(stepUpData.totalReturns)}`}
                   {activeTab === 'lumpsum' && `+${formatCurrency(lumpData.profit)}`}
-                  {activeTab === 'xirr' && `+${formatCurrency(xirrData.netProfit)}`}
-                  {activeTab === 'cagr' && `+${formatCurrency(cagrData.profit)}`}
+                  {activeTab === 'xirr' && (xirrData.netProfit >= 0 ? `+${formatCurrency(xirrData.netProfit)}` : `-${formatCurrency(Math.abs(xirrData.netProfit))}`)}
+                  {activeTab === 'cagr' && (cagrData.profit >= 0 ? `+${formatCurrency(cagrData.profit)}` : `-${formatCurrency(Math.abs(cagrData.profit))}`)}
                   {activeTab === 'compound' && `+${formatCurrency(ciData.interestEarned)}`}
                   {activeTab === 'emi' && formatCurrency(emiData.totalInterest)}
                   {activeTab === 'swp' && formatCurrency(swpData.totalWithdrawn)}
@@ -1968,6 +2331,7 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
         </div>
 
       </div>
+      )}
     </div>
   );
 };

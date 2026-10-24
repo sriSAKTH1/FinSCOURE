@@ -181,12 +181,18 @@ export function calculateInsuranceScore(
   const healthSumInsured = health.hasCover ? parseNum(health.sumInsured) : 0;
 
   let healthScore = 0;
-  if (health.hasCover && healthSumInsured > 0) {
-    const ratio = healthSumInsured / targetHealthCover;
-    if (ratio >= 1.0) healthScore = 15;
-    else if (ratio >= 0.7) healthScore = 12;
-    else if (ratio >= 0.4) healthScore = 8;
-    else healthScore = 4;
+  if (health.hasCover) {
+    if (health.source === 'employer') {
+      // Corporate insurance only: awarded 5 marks
+      healthScore = 5;
+    } else if (health.source === 'retail' || health.source === 'both') {
+      // Personal insurance or Both: awarded full mark (15/15)
+      healthScore = 15;
+    } else {
+      healthScore = 5;
+    }
+  } else {
+    healthScore = 0;
   }
 
   // Life insurance scoring depends on dependents:
@@ -217,6 +223,8 @@ export function calculateInsuranceScore(
   const protectionGaps: string[] = [];
   if (!health.hasCover || healthSumInsured === 0) {
     protectionGaps.push('No active health insurance policy recorded.');
+  } else if (health.source === 'employer') {
+    protectionGaps.push('Only corporate health insurance active (5/15 marks). Corporate coverage lapses upon job change; securing personal health insurance is strongly recommended.');
   } else if (healthSumInsured < targetHealthCover) {
     protectionGaps.push(`Health cover is below recommended target of ${formatCurrency(targetHealthCover, currency)}.`);
   }
@@ -754,7 +762,40 @@ export function calculateFinScore(data: AssessmentData): FinScoreResult {
     const monthsRemaining = yearsRemaining * 12;
     const remainingToSave = Math.max(0, targetAmt - saved);
     const monthlyRequired = monthsRemaining > 0 ? Math.round(remainingToSave / monthsRemaining) : 0;
-    const onTrack = cont >= monthlyRequired;
+
+    // Strict 100-mark calculation for Future Goal
+    // If goal is big and not saving anything (saved = 0 and monthly contribution = 0): exactly 0 marks!
+    let score = 0;
+    let onTrack = false;
+    let progressPct = 0;
+
+    if (targetAmt > 0) {
+      progressPct = Math.min(100, Math.round((saved / targetAmt) * 100));
+
+      if (saved >= targetAmt) {
+        score = 100;
+        onTrack = true;
+      } else if (saved === 0 && cont === 0) {
+        // Not saving now (zero saved & zero contribution) -> exactly 0 marks!
+        score = 0;
+        onTrack = false;
+      } else {
+        const fundingRatio = monthlyRequired > 0 ? Math.min(1, cont / monthlyRequired) : 0;
+        const progressRatio = Math.min(1, saved / targetAmt);
+
+        if (cont >= monthlyRequired && cont > 0) {
+          onTrack = true;
+          score = Math.min(100, Math.round(80 + progressRatio * 20));
+        } else {
+          onTrack = false;
+          // Partial credit only based on actual contribution rate and saved corpus
+          score = Math.min(79, Math.round((fundingRatio * 65) + (progressRatio * 20)));
+        }
+      }
+    } else {
+      score = 0;
+      onTrack = false;
+    }
 
     return {
       goalId: g.id,
@@ -764,7 +805,10 @@ export function calculateFinScore(data: AssessmentData): FinScoreResult {
       yearsRemaining,
       monthlyRequired,
       currentMonthlyContribution: cont,
+      savedAmount: saved,
       onTrack,
+      score,
+      progressPct,
       hidden: !!g.hidden
     };
   });

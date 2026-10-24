@@ -99,6 +99,9 @@ export interface FinScoreResult {
       yearsRemaining: number;
       monthlyRequired: number;
       currentMonthlyContribution: number;
+      savedAmount?: number;
+      score: number;
+      progressPct: number;
       onTrack: boolean;
       hidden?: boolean;
     }[];
