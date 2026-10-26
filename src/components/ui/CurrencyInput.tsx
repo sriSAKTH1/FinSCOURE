@@ -37,8 +37,6 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   showQuickChips = false,
 }) => {
   const symbol = '₹';
-  const isMuted = frequency === 'N';
-
   // Local text input state to allow typing shorthand like "1k", "2l", "1cr"
   const [inputText, setInputText] = useState<string>(
     value === '' || value === undefined || value === null ? '' : String(value)
@@ -84,7 +82,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   };
 
   const numericValue = typeof value === 'number' ? value : parseShorthandAmount(value);
-  const highlight = isMuted ? null : getPriceHighlight(numericValue, 'INR');
+  const highlight = getPriceHighlight(numericValue, 'INR');
 
   const quickChips = [
     { label: '1k', val: 1000 },
@@ -106,11 +104,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
 
       <div className="flex items-center gap-2">
         <div
-          className={`relative flex-1 flex items-center rounded-xl border bg-white shadow-2xs transition-all ${
-            isMuted
-              ? 'border-zinc-200/60 bg-zinc-50/50 opacity-60'
-              : 'border-zinc-200 hover:border-zinc-300 focus-within:border-[#1b4d3e] focus-within:ring-3 focus-within:ring-[#1b4d3e]/10'
-          }`}
+          className="relative flex-1 flex items-center rounded-xl border bg-white shadow-2xs transition-all border-zinc-200 hover:border-zinc-300 focus-within:border-[#1b4d3e] focus-within:ring-3 focus-within:ring-[#1b4d3e]/10"
         >
           {/* INR Currency Symbol Prefix */}
           <span className="pl-4 text-emerald-800 select-none text-sm sm:text-base font-bold">
@@ -120,8 +114,8 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           {/* Number & Shorthand Input (Supports 100, 1k, 1L, 1Cr, 50000, etc.) */}
           <input
             type="text"
-            disabled={disabled || isMuted}
-            value={isMuted ? '0' : inputText}
+            disabled={disabled}
+            value={inputText}
             onChange={handleInputChange}
             onBlur={handleBlur}
             placeholder={placeholder}
@@ -135,14 +129,14 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           )}
         </div>
 
-        {/* Optional frequency pill toggle [N | M | W] */}
+        {/* Optional category toggle [N (Need) | E (Expense) | W (Want)] */}
         {frequency && onFrequencyChange && (
           <FrequencyToggle value={frequency} onChange={onFrequencyChange} />
         )}
       </div>
 
-      {/* Real-time Highlighted Amount Preview: Shows compact tag (100, 1k, 1L, 1Cr) + formatted amount + words only when a value is entered */}
-      {showPriceInWords && !isMuted && highlight && (
+      {/* Real-time Highlighted Amount Preview */}
+      {showPriceInWords && highlight && (
         <div className="flex flex-wrap items-center gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-[#eaf5ef] text-[#1b4d3e] rounded-xl border border-[#b7dfcb] shadow-xs">
             {/* Shorthand Tag Badge (100, 1k, 1L, 1Cr) */}

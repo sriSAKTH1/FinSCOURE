@@ -37,11 +37,12 @@ export const Step8Review: React.FC<Step8Props> = ({
   const currency = personal.currency;
 
   const income = calculateTotalMonthlyIncome(data);
-  const expenseBreakdown = calculateTotalMonthlyExpenses(expenses, data.customExpenses);
+  const expenseBreakdown = calculateTotalMonthlyExpenses(expenses, data.customExpenses, loans);
   const totalEmi = loans.reduce((acc, l) => acc + parseNum(l.monthlyEmi), 0);
   const totalDebt = loans.reduce((acc, l) => acc + parseNum(l.principal), 0);
   const totalAssets = assets.reduce((acc, a) => acc + parseNum(a.currentValue), 0);
-  const surplus = income - expenseBreakdown.total - totalEmi;
+  const livingExpenses = Math.max(0, expenseBreakdown.total - (totalEmi > 0 ? totalEmi : parseNum(expenses.loans?.amount)));
+  const surplus = income - expenseBreakdown.total;
 
   return (
     <StepCard
@@ -61,7 +62,7 @@ export const Step8Review: React.FC<Step8Props> = ({
           <div>
             <div className="text-[11px] font-semibold text-zinc-500 uppercase">Monthly Expenses</div>
             <div className="text-base font-extrabold text-zinc-900">
-              {formatCurrency(expenseBreakdown.total, currency)}/mo
+              {formatCurrency(livingExpenses, currency)}/mo
             </div>
           </div>
           <div>

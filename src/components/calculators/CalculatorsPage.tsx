@@ -32,9 +32,11 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/calculations';
 import { StandardCalculator } from './StandardCalculator';
+import { FireCalculator } from './FireCalculator';
 
 export type CalculatorId = 
   | 'normal'
+  | 'fire'
   | 'sip' 
   | 'inflation'
   | 'stepup' 
@@ -683,6 +685,7 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
   // Tab Definitions matching user screenshot style
   const calculatorTabs: { id: CalculatorId; label: string; badge?: string; icon: React.ReactNode }[] = [
     { id: 'normal', label: 'Normal Calculator', badge: 'Standard', icon: <Calculator className="w-4 h-4 text-emerald-700" /> },
+    { id: 'fire', label: 'FIRE Calculator', badge: '🔥 Retire Early', icon: <Flame className="w-4 h-4 text-amber-500 fill-amber-500" /> },
     { id: 'sip', label: 'SIP Calculator', icon: <TrendingUp className="w-4 h-4 text-emerald-600" /> },
     { id: 'inflation', label: 'Inflation', badge: '🔥 Cost of Living', icon: <Flame className="w-4 h-4 text-rose-600" /> },
     { id: 'stepup', label: 'Step-Up SIP', badge: '📈 2x', icon: <ArrowUpRight className="w-4 h-4 text-teal-600" /> },
@@ -1010,9 +1013,11 @@ export const CalculatorsPage: React.FC<CalculatorsPageProps> = ({
         </div>
       </div>
 
-      {/* MAIN WORKSPACE: NORMAL CALCULATOR OR 2-COLUMN FINANCIAL CALCULATOR */}
+      {/* MAIN WORKSPACE: NORMAL CALCULATOR, FIRE CALCULATOR OR 2-COLUMN FINANCIAL CALCULATOR */}
       {activeTab === 'normal' ? (
         <StandardCalculator />
+      ) : activeTab === 'fire' ? (
+        <FireCalculator />
       ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         

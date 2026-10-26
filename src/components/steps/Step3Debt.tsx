@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Receipt,
   Layers,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 
 interface Step3Props {
@@ -49,6 +50,25 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
     return { year, readable };
   };
 
+  const getDateStringFromMonths = (months: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + (months || 12));
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(Math.min(28, d.getDate())).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getMonthsFromDateString = (dateStr: string) => {
+    if (!dateStr) return 12;
+    const target = new Date(dateStr);
+    const now = new Date();
+    const diffYears = target.getFullYear() - now.getFullYear();
+    const diffMonths = target.getMonth() - now.getMonth();
+    const totalMonths = diffYears * 12 + diffMonths;
+    return Math.max(1, totalMonths);
+  };
+
   // State for the "Add Loan" form
   const [formType, setFormType] = useState<LoanType>('home');
   const [formName, setFormName] = useState('Home Loan');
@@ -56,14 +76,34 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
   const [formMonthlyEmi, setFormMonthlyEmi] = useState<number | ''>(22000);
   const [formInterestRate, setFormInterestRate] = useState<number | ''>(8.5);
   const [formRemainingMonths, setFormRemainingMonths] = useState<number | ''>(180);
+  const [formEndDate, setFormEndDate] = useState<string>(() => getDateStringFromMonths(180));
   const [formIsOverdue, setFormIsOverdue] = useState(false);
   const [formOverdueAmount, setFormOverdueAmount] = useState<number | ''>('');
+
+  const handleEndDateChange = (dateVal: string) => {
+    setFormEndDate(dateVal);
+    if (dateVal) {
+      const calculatedMonths = getMonthsFromDateString(dateVal);
+      setFormRemainingMonths(calculatedMonths);
+    }
+  };
+
+  const handleRemainingMonthsChange = (monthsVal: number | '') => {
+    setFormRemainingMonths(monthsVal);
+    if (typeof monthsVal === 'number' && monthsVal > 0) {
+      setFormEndDate(getDateStringFromMonths(monthsVal));
+    }
+  };
 
   const toggleNoDebt = (noDebt: boolean) => {
     onChange({
       ...data,
       hasLoans: !noDebt,
       loans: noDebt ? [] : data.loans,
+      expenses: {
+        ...data.expenses,
+        loans: { amount: noDebt ? '' : (data.expenses.loans?.amount ?? ''), frequency: 'N' },
+      },
     });
   };
 
@@ -77,14 +117,22 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
       monthlyEmi: parseNum(formMonthlyEmi) || 0,
       interestRate: parseNum(formInterestRate) || 0,
       remainingMonths: parseNum(formRemainingMonths) || 12,
+      endDate: formEndDate || undefined,
       overdueAmount: formIsOverdue ? parseNum(formOverdueAmount) || 0 : 0,
       isOverdue: formIsOverdue,
     };
 
+    const updatedLoans = [...loans, newLoan];
+    const totalEmi = updatedLoans.reduce((sum, l) => sum + parseNum(l.monthlyEmi), 0);
+
     onChange({
       ...data,
       hasLoans: true,
-      loans: [...loans, newLoan],
+      loans: updatedLoans,
+      expenses: {
+        ...data.expenses,
+        loans: { amount: totalEmi > 0 ? totalEmi : '', frequency: data.expenses.loans?.frequency ?? 'N' },
+      },
     });
 
     // Reset form for next loan
@@ -93,17 +141,23 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
     setFormPrincipal('');
     setFormMonthlyEmi('');
     setFormInterestRate('');
-    setFormRemainingMonths('');
+    setFormRemainingMonths(60);
+    setFormEndDate(getDateStringFromMonths(60));
     setFormIsOverdue(false);
     setFormOverdueAmount('');
   };
 
   const removeLoan = (id: string) => {
     const updated = loans.filter((l) => l.id !== id);
+    const totalEmi = updated.reduce((sum, l) => sum + parseNum(l.monthlyEmi), 0);
     onChange({
       ...data,
       loans: updated,
       hasLoans: updated.length > 0,
+      expenses: {
+        ...data.expenses,
+        loans: { amount: totalEmi > 0 ? totalEmi : '', frequency: data.expenses.loans?.frequency ?? 'N' },
+      },
     });
   };
 
@@ -272,8 +326,10 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
                         </div>
 
                         <div className="flex items-center gap-1.5 text-blue-600 font-bold pt-1">
-                          <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                          <span>Tenure & Payoff: {months} Mos · Target {payoff.readable}</span>
+                          <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span>
+                            End Date: {loan.endDate ? new Date(loan.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : payoff.readable} · ({months} Mos left)
+                          </span>
                         </div>
                       </div>
 
@@ -397,8 +453,8 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
               />
             </div>
 
-            {/* Interest Rate & Remaining Months */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Interest Rate, Calendar End Date, and Remaining Months */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-800">
                   Annual Interest Rate (% p.a.)
@@ -418,6 +474,23 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
                 </div>
               </div>
 
+              {/* Exact Loan End Date Picker using Calendar */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-800 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#1b4d3e]" />
+                  <span>Loan End Date (Calendar)</span>
+                </label>
+                <div className="relative flex items-center rounded-xl border border-zinc-200 bg-white shadow-2xs focus-within:border-[#1b4d3e]">
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={formEndDate}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
+                    className="w-full px-4 py-3 text-sm font-medium text-zinc-900 focus:outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-800">
                   Remaining Tenure (Months)
@@ -428,7 +501,7 @@ export const Step3Debt: React.FC<Step3Props> = ({ data, onChange }) => {
                     min="1"
                     max="360"
                     value={formRemainingMonths}
-                    onChange={(e) => setFormRemainingMonths(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    onChange={(e) => handleRemainingMonthsChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                     placeholder="e.g. 180"
                     className="w-full px-4 py-3 text-sm font-medium text-zinc-900 focus:outline-none"
                   />

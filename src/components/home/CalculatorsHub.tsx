@@ -55,8 +55,22 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
     formulaSnippet: 'Standard Arithmetic & Memory (MC, MR, M+, M-)',
   },
   {
-    id: 'sip',
+    id: 'fire',
     number: '02',
+    name: 'FIRE Number Calculator',
+    subtitle: 'Financial Independence & Early Retirement',
+    badge: '🔥 Retire Early',
+    badgeColor: 'bg-amber-50 text-amber-900 border-amber-300',
+    description: 'Calculate your target retirement corpus using 25×, 30×, or 33× multipliers with Indian inflation. Get a full post-FIRE income plan, G-Sec/SCSS options, and wealth gap analysis.',
+    iconBg: 'bg-amber-50 text-amber-600',
+    iconColor: 'text-amber-600',
+    icon: <Flame className="w-5 h-5 fill-amber-500" />,
+    exampleHighlight: '₹40k/mo @ 6% inflation for 20 yrs → ₹3.85 Cr Target (25×)',
+    formulaSnippet: 'FIRE Number = E_M × 12 × (1 + i)ⁿ × Multiplier',
+  },
+  {
+    id: 'sip',
+    number: '03',
     name: 'SIP Calculator',
     subtitle: 'Systematic Investment Plan',
     badge: 'Wealth Builder',
@@ -70,7 +84,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'inflation',
-    number: '02',
+    number: '04',
     name: 'Inflation Calculator',
     subtitle: 'Purchasing Power & Cost of Living',
     badge: 'Cost of Living',
@@ -84,7 +98,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'lumpsum',
-    number: '03',
+    number: '05',
     name: 'Lumpsum Calculator',
     subtitle: 'One-Time Deposit Growth',
     badge: 'Single Deposit',
@@ -98,7 +112,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'xirr',
-    number: '04',
+    number: '06',
     name: 'XIRR Calculator',
     subtitle: 'Extended Internal Rate of Return',
     badge: 'Irregular Cash Flows',
@@ -112,7 +126,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'cagr',
-    number: '05',
+    number: '07',
     name: 'CAGR Calculator',
     subtitle: 'Compound Annual Growth Rate',
     badge: 'Point-to-Point',
@@ -126,7 +140,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'compound',
-    number: '06',
+    number: '08',
     name: 'Compound Interest',
     subtitle: 'Frequency & Power Multiplier',
     badge: 'Wealth Multiplier',
@@ -140,7 +154,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'emi',
-    number: '07',
+    number: '09',
     name: 'EMI Calculator',
     subtitle: 'Home, Car & Personal Loans',
     badge: 'Amortization Plan',
@@ -154,7 +168,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'swp',
-    number: '08',
+    number: '10',
     name: 'SWP Calculator',
     subtitle: 'Systematic Withdrawal Plan',
     badge: 'Retirement Cashflow',
@@ -168,7 +182,7 @@ const CALCULATORS_LIST: CalculatorCardInfo[] = [
   },
   {
     id: 'nps',
-    number: '09',
+    number: '11',
     name: 'NPS & Post Office MIS',
     subtitle: 'Govt Sovereign & Pension Schemes',
     badge: 'Guaranteed & Annuity',

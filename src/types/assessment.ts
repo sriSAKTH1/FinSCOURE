@@ -19,7 +19,7 @@ export type AssetCategory =
 
 export type GoalCategory = 'home' | 'education' | 'retirement' | 'vehicle' | 'wealth' | 'wedding' | 'other';
 
-export type ExpenseFrequency = 'N' | 'M' | 'W'; // None (0), Monthly (1x), Weekly (4.33x)
+export type ExpenseFrequency = 'N' | 'E' | 'W' | 'M'; // N = Need, E = Expense, W = Want (M supported for backwards compatibility)
 
 export interface PersonalDetails {
   firstName: string;
@@ -58,6 +58,7 @@ export interface MonthlyExpenses {
   education: ExpenseItem;
   travel: ExpenseItem;
   familySupport: ExpenseItem;
+  loans?: ExpenseItem;
   other: ExpenseItem;
 }
 
@@ -77,6 +78,7 @@ export interface LoanItem {
   monthlyEmi: number | '';
   interestRate: number | '';
   remainingMonths: number | '';
+  endDate?: string;
   overdueAmount: number | '';
   isOverdue: boolean;
 }

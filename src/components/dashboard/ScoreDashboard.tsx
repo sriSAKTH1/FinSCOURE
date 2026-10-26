@@ -11,8 +11,10 @@ import { RecommendationsList } from './RecommendationsList';
 import { PersonalBalanceSheet } from './PersonalBalanceSheet';
 import { AssetAllocationAdvisor } from './AssetAllocationAdvisor';
 import { DebtRepaymentAdvisor } from './DebtRepaymentAdvisor';
+import { RetirementFireAdvisor } from './RetirementFireAdvisor';
 import { ScoreReportPrint } from './ScoreReportPrint';
 import { formatCurrency } from '@/utils/calculations';
+import { CalculatorId } from '@/components/calculators/CalculatorsPage';
 import confetti from 'canvas-confetti';
 import {
   Printer,
@@ -36,6 +38,7 @@ interface ScoreDashboardProps {
   onReset: () => void;
   onHome?: () => void;
   onUpdateAssessment?: (data: AssessmentData) => void;
+  onNavigateToCalculator?: (calcId: CalculatorId) => void;
 }
 
 export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
@@ -45,6 +48,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
   onReset,
   onHome,
   onUpdateAssessment,
+  onNavigateToCalculator,
 }) => {
   const { totalScore, grade, gradeTitle, gradeDescription, pillarScores, swot, recommendations, metrics, currency } = scoreResult;
 
@@ -114,8 +118,8 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
     }
   }, []);
 
-  // Only one advisor (Asset Allocation or Debt Repayment) can be open at a time
-  const [openAdvisor, setOpenAdvisor] = useState<'none' | 'asset' | 'debt'>('none');
+  // Only one advisor (Asset Allocation, Debt Repayment, or Retirement FIRE) can be open at a time
+  const [openAdvisor, setOpenAdvisor] = useState<'none' | 'asset' | 'debt' | 'retirement'>('none');
 
   // Track hidden goals (both locally and synced with assessment)
   const [hiddenGoalIds, setHiddenGoalIds] = useState<Set<string>>(() => {
@@ -378,9 +382,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
             score={p.savingsHealth.score}
             maxScore={25}
             breakdown={[
-              { label: 'Monthly savings rate', score: p.savingsHealth.savingsRateScore, maxScore: 15 },
-              { label: 'Positive cash flow', score: p.savingsHealth.cashFlowScore, maxScore: 5 },
-              { label: 'Consistency & SIP investments', score: p.savingsHealth.consistencyScore, maxScore: 5 },
+              { label: 'Savings rate score (≥20% gives 25 marks, <20% gives % as marks)', score: p.savingsHealth.score, maxScore: 25 },
             ]}
             metrics={[
               { label: 'Monthly Income', value: formatCurrency(p.savingsHealth.monthlyIncome, curr) },
@@ -424,7 +426,11 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
       </div>
 
       {/* Score Analytics & Financial Diagnostics (Radar, Trajectory, Cash Flow, Stress Test) */}
-      <ScoreAnalytics assessment={assessment} scoreResult={scoreResult} />
+      <ScoreAnalytics
+        assessment={assessment}
+        scoreResult={scoreResult}
+        hiddenGoalIds={hiddenGoalIds}
+      />
 
       {/* SWOT Matrix Analysis */}
       <SwotMatrix swot={swot} />
@@ -442,6 +448,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
         const totalActiveRequiredMonthly = activeGoals.reduce((sum, g) => sum + g.monthlyRequired, 0);
         const totalActiveCurrentMonthly = activeGoals.reduce((sum, g) => sum + g.currentMonthlyContribution, 0);
         const totalActiveTargetAmount = activeGoals.reduce((sum, g) => sum + g.targetAmount, 0);
+        const totalActiveSavedAmount = activeGoals.reduce((sum, g) => sum + (g.savedAmount || 0), 0);
 
         return (
           <div className="bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
@@ -491,6 +498,7 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                   <tr className="border-b border-zinc-100 text-zinc-400 font-semibold uppercase">
                     <th className="py-2.5">Goal</th>
                     <th className="py-2.5">Target</th>
+                    <th className="py-2.5 text-emerald-800 font-bold">Current Saved</th>
                     <th className="py-2.5">Target Year</th>
                     <th className="py-2.5">Required /mo</th>
                     <th className="py-2.5">Current /mo</th>
@@ -521,6 +529,9 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                         </td>
                         <td className={`py-3 font-semibold ${isHidden ? 'line-through text-zinc-400' : 'text-zinc-800'}`}>
                           {formatCurrency(g.targetAmount, curr)}
+                        </td>
+                        <td className={`py-3 font-bold ${isHidden ? 'line-through text-zinc-400' : 'text-emerald-700'}`}>
+                          {formatCurrency(g.savedAmount || 0, curr)}
                         </td>
                         <td className={`py-3 ${isHidden ? 'text-zinc-400' : 'text-zinc-600'}`}>
                           {g.targetYear} ({g.yearsRemaining} yrs left)
@@ -592,6 +603,9 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
                     <td className="py-3 font-extrabold text-zinc-900">
                       {formatCurrency(totalActiveTargetAmount, curr)}
                     </td>
+                    <td className="py-3 font-black text-emerald-800">
+                      {formatCurrency(totalActiveSavedAmount, curr)}
+                    </td>
                     <td className="py-3 text-zinc-400 font-normal">—</td>
                     <td className="py-3 font-black text-sm text-[#1b4d3e]">
                       {formatCurrency(totalActiveRequiredMonthly, curr)}/mo
@@ -640,6 +654,15 @@ export const ScoreDashboard: React.FC<ScoreDashboardProps> = ({
         onUpdateAssessment={onUpdateAssessment}
         isOpen={openAdvisor === 'debt'}
         onToggleOpen={(open) => setOpenAdvisor(open ? 'debt' : 'none')}
+      />
+
+      {/* Retirement Planning & FIRE Strategy Advisor (Only one open at a time) */}
+      <RetirementFireAdvisor
+        assessment={assessment}
+        scoreResult={scoreResult}
+        isOpen={openAdvisor === 'retirement'}
+        onToggleOpen={(open) => setOpenAdvisor(open ? 'retirement' : 'none')}
+        onOpenFireCalculator={() => onNavigateToCalculator?.('fire')}
       />
 
       {/* Bottom Sticky Retake Banner: Hidden in PDF print */}

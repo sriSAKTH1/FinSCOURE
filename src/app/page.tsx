@@ -470,6 +470,9 @@ export default function App() {
               onUpdateAssessment={(updated) => {
                 setAssessment(updated);
               }}
+              onNavigateToCalculator={(calcId) => {
+                navigateTo('calculators', { calcId });
+              }}
             />
           </div>
         )}

@@ -23,6 +23,7 @@ import {
 interface ScoreAnalyticsProps {
   assessment: AssessmentData;
   scoreResult: FinScoreResult;
+  hiddenGoalIds?: Set<string>;
 }
 
 type AnalyticsTab = 'radar' | 'trajectory' | 'cashflow' | 'stresstest';
@@ -30,6 +31,7 @@ type AnalyticsTab = 'radar' | 'trajectory' | 'cashflow' | 'stresstest';
 export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
   assessment,
   scoreResult,
+  hiddenGoalIds,
 }) => {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('radar');
   const { totalScore, pillarScores, metrics, currency } = scoreResult;
@@ -37,18 +39,29 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
   // 1. RADAR SPOKES (0 - 100 scale)
   const radarData = useMemo(() => {
     const efScore = Math.min(100, Math.max(0, Math.round((pillarScores.emergencyFund.score / 25) * 100)));
-    const debtScore = Math.min(100, Math.max(0, Math.round((pillarScores.debtHealth.score / 25) * 100)));
+    const hasActiveDebt = assessment.hasLoans && assessment.loans.length > 0 && pillarScores.debtHealth.totalDebtPrincipal > 0;
+    const debtScore = !hasActiveDebt
+      ? 100
+      : Math.min(29, Math.max(0, Math.round((pillarScores.debtHealth.score / 25) * 100)));
     const savingsScore = Math.min(100, Math.max(0, Math.round((pillarScores.savingsHealth.score / 25) * 100)));
     const insuranceScore = Math.min(100, Math.max(0, Math.round((pillarScores.insuranceProtection.score / 25) * 100)));
     
-    // Future Goals spoke (Strict 100-mark calculation based on actual savings and monthly contribution)
+    // Future Goals spoke: Strict comparison of all active goal target amounts against current savings and contributions gave for those goals
     let goalsScore = 0;
     if (metrics.goalsAnalysis && metrics.goalsAnalysis.length > 0) {
-      const activeGoals = metrics.goalsAnalysis.filter(g => !g.hidden);
+      const activeGoals = metrics.goalsAnalysis.filter(
+        (g) => !g.hidden && !hiddenGoalIds?.has(g.goalId)
+      );
       if (activeGoals.length > 0) {
-        // Average of individual active goal scores (0 - 100 marks each)
-        const totalScore = activeGoals.reduce((sum, g) => sum + (g.score ?? 0), 0);
-        goalsScore = Math.round(totalScore / activeGoals.length);
+        // Compare total current savings directly against total goal targets (10k of 1L = 10 marks, full = 100)
+        const totalGoalAmount = activeGoals.reduce((sum, g) => sum + (g.targetAmount || 0), 0);
+        const totalSavedAmount = activeGoals.reduce((sum, g) => sum + (g.savedAmount || 0), 0);
+
+        if (totalGoalAmount > 0) {
+          goalsScore = Math.min(100, Math.max(0, Math.round((totalSavedAmount / totalGoalAmount) * 100)));
+        } else {
+          goalsScore = 0;
+        }
       } else {
         goalsScore = 0;
       }
@@ -77,7 +90,7 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
     const weakest = sorted[sorted.length - 1];
 
     return { spokes, symmetry, strongest, weakest };
-  }, [pillarScores, metrics, assessment]);
+  }, [pillarScores, metrics, assessment, hiddenGoalIds]);
 
   // SVG Radar Geometry (Center at 160, 160; Radius 110)
   const cx = 160;
@@ -442,7 +455,11 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
                 {radarData.strongest.label} ({radarData.strongest.value}/100)
               </div>
               <p className="text-xs text-zinc-500">
-                Excellent foundation. Keep maintaining this benchmark without relaxing capital discipline.
+                {radarData.strongest.key === 'goals'
+                  ? `Outstanding milestone funding at ${radarData.strongest.value}% across your target goals. Your savings and contributions are well-aligned.`
+                  : radarData.strongest.key === 'debt' && radarData.strongest.value === 100
+                  ? 'Zero active debt: 100/100 score! Outstanding financial fortress with no EMI obligations.'
+                  : 'Excellent foundation. Keep maintaining this benchmark without relaxing capital discipline.'}
               </p>
             </div>
 
@@ -456,8 +473,12 @@ export const ScoreAnalytics: React.FC<ScoreAnalyticsProps> = ({
                 {radarData.weakest.label} ({radarData.weakest.value}/100)
               </div>
               <p className="text-xs text-zinc-500">
-                {radarData.weakest.key === 'goals' && radarData.weakest.value === 0
-                  ? 'Your future goal currently has zero saved corpus and ₹0/mo contribution (0/100 marks). Allocate monthly surplus or start an investment plan to start scoring.'
+                {radarData.weakest.key === 'goals'
+                  ? radarData.weakest.value === 0
+                    ? 'Your milestone goals currently have zero savings and zero allocated contributions (0/100 marks). Allocate monthly surplus or start an investment plan to start scoring.'
+                    : `Your milestone goals are currently funded at ${radarData.weakest.value}% of total goal targets based on current savings and contributions.`
+                  : radarData.weakest.key === 'debt'
+                  ? `Active debt health score is ${radarData.weakest.value}/100 (< 30 due to ongoing liabilities). Keep monthly EMIs below 30% of income and accelerate payoff.`
                   : 'Addressing this spoke offers the fastest score gain and greatest long-term stability.'}
               </p>
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AssessmentData, ExpenseFrequency, MonthlyExpenses, CustomExpenseItem } from '@/types/assessment';
+import { AssessmentData, ExpenseFrequency, MonthlyExpenses, CustomExpenseItem, LoanItem } from '@/types/assessment';
 import { StepCard } from '../ui/StepCard';
 import { CurrencyInput } from '../ui/CurrencyInput';
 import { calculateTotalMonthlyExpenses, calculateTotalMonthlyIncome, formatCurrency } from '@/utils/calculations';
@@ -84,7 +84,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
     });
   };
 
-  const totals = calculateTotalMonthlyExpenses(expenses, customExpenses);
+  const totals = calculateTotalMonthlyExpenses(expenses, customExpenses, data.loans);
   const totalIncome = calculateTotalMonthlyIncome(data);
   const totalExpenses = totals.total;
   const savingsAmount = totalIncome - totalExpenses;
@@ -93,18 +93,25 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
 
   // Count how many expenses are filled with positive values
   const filledExpensesCount = Object.values(expenses).filter(
-    (item) => typeof item?.amount === 'number' && item.amount > 0 && item.frequency !== 'N'
+    (item) => typeof item?.amount === 'number' && item.amount > 0
   ).length + (customExpenses || []).filter(
-    (item) => typeof item?.amount === 'number' && item.amount > 0 && item.frequency !== 'N'
+    (item) => typeof item?.amount === 'number' && item.amount > 0
   ).length;
 
   const hasMinimumExpenses = filledExpensesCount >= 2;
+
+  const totalLoanEmi = (data.loans || []).reduce((acc, l) => acc + (typeof l.monthlyEmi === 'number' ? l.monthlyEmi : 0), 0);
+  const loanEmiValue = expenses.loans?.amount !== undefined && expenses.loans?.amount !== ''
+    ? expenses.loans.amount
+    : totalLoanEmi > 0
+    ? totalLoanEmi
+    : '';
 
   return (
     <StepCard
       stepNumber={2}
       title="Monthly expenses"
-      subtitle="Capture your regular spending. Leave out loan payments and insurance for now."
+      subtitle="Capture your regular monthly spending including living essentials, EMIs, and lifestyle expenses."
       headerAction={
         <div className="text-right hidden sm:block">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Total Outflow</div>
@@ -144,13 +151,32 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
           </div>
         </div>
 
+        {/* N / E / W Classification Legend Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 text-xs shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-zinc-900">Expense Classification:</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[11px] border border-emerald-300">
+              N = Need
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 font-extrabold text-[11px] border border-blue-300">
+              E = Expense
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-extrabold text-[11px] border border-amber-300">
+              W = Want
+            </span>
+          </div>
+          <span className="text-[11px] text-zinc-600 font-medium">
+            💡 Emergency Fund takes <strong>N + E (Needs + Expenses)</strong> as runway requirement
+          </span>
+        </div>
+
         {/* Two Column Layout matching Screenshot 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Column 1: Everyday essentials */}
           <div className="space-y-5">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
               <h3 className="text-sm font-bold text-zinc-900 tracking-tight flex items-center gap-1">
-                Everyday essentials <span className="text-rose-500 text-xs font-bold">*</span>
+                Everyday essentials (N & E) <span className="text-rose-500 text-xs font-bold">*</span>
               </h3>
               <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                 {formatCurrency(totals.essential, currency)}/mo
@@ -165,7 +191,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.rent?.amount ?? ''}
               onChange={(val) => updateExpense('rent', val)}
-              frequency={expenses.rent?.frequency ?? 'M'}
+              frequency={expenses.rent?.frequency ?? 'N'}
               onFrequencyChange={(freq) => updateExpense('rent', undefined, freq)}
               currency={currency}
             />
@@ -178,8 +204,59 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.food?.amount ?? ''}
               onChange={(val) => updateExpense('food', val)}
-              frequency={expenses.food?.frequency ?? 'M'}
+              frequency={expenses.food?.frequency ?? 'N'}
               onFrequencyChange={(freq) => updateExpense('food', undefined, freq)}
+              currency={currency}
+            />
+
+            <CurrencyInput
+              label={
+                <span className="inline-flex items-center gap-1">
+                  Loans & debt EMIs <span className="text-rose-500 font-bold text-xs">*</span>
+                </span>
+              }
+              value={loanEmiValue}
+              onChange={(val) => {
+                updateExpense('loans', val);
+                const numVal = typeof val === 'number' ? val : 0;
+                if (data.loans && data.loans.length === 1) {
+                  const updatedLoans = [{ ...data.loans[0], monthlyEmi: val }];
+                  onChange({
+                    ...data,
+                    expenses: {
+                      ...expenses,
+                      loans: { amount: val, frequency: expenses.loans?.frequency ?? 'N' },
+                    },
+                    loans: updatedLoans,
+                    hasLoans: numVal > 0,
+                  });
+                } else if (!data.loans || data.loans.length === 0) {
+                  if (numVal > 0) {
+                    const newLoan: LoanItem = {
+                      id: `loan-${Date.now()}`,
+                      type: 'personal' as const,
+                      customName: 'Active Loan / EMI',
+                      principal: '',
+                      monthlyEmi: val,
+                      interestRate: '',
+                      remainingMonths: 12,
+                      overdueAmount: 0,
+                      isOverdue: false,
+                    };
+                    onChange({
+                      ...data,
+                      expenses: {
+                        ...expenses,
+                        loans: { amount: val, frequency: expenses.loans?.frequency ?? 'N' },
+                      },
+                      hasLoans: true,
+                      loans: [newLoan],
+                    });
+                  }
+                }
+              }}
+              frequency={expenses.loans?.frequency ?? 'N'}
+              onFrequencyChange={(freq) => updateExpense('loans', undefined, freq)}
               currency={currency}
             />
 
@@ -191,7 +268,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.utilities?.amount ?? ''}
               onChange={(val) => updateExpense('utilities', val)}
-              frequency={expenses.utilities?.frequency ?? 'M'}
+              frequency={expenses.utilities?.frequency ?? 'E'}
               onFrequencyChange={(freq) => updateExpense('utilities', undefined, freq)}
               currency={currency}
             />
@@ -204,7 +281,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.transport?.amount ?? ''}
               onChange={(val) => updateExpense('transport', val)}
-              frequency={expenses.transport?.frequency ?? 'M'}
+              frequency={expenses.transport?.frequency ?? 'E'}
               onFrequencyChange={(freq) => updateExpense('transport', undefined, freq)}
               currency={currency}
             />
@@ -217,7 +294,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.healthcare?.amount ?? ''}
               onChange={(val) => updateExpense('healthcare', val)}
-              frequency={expenses.healthcare?.frequency ?? 'M'}
+              frequency={expenses.healthcare?.frequency ?? 'N'}
               onFrequencyChange={(freq) => updateExpense('healthcare', undefined, freq)}
               currency={currency}
             />
@@ -230,7 +307,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.education?.amount ?? ''}
               onChange={(val) => updateExpense('education', val)}
-              frequency={expenses.education?.frequency ?? 'M'}
+              frequency={expenses.education?.frequency ?? 'N'}
               onFrequencyChange={(freq) => updateExpense('education', undefined, freq)}
               currency={currency}
             />
@@ -243,7 +320,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.familySupport?.amount ?? ''}
               onChange={(val) => updateExpense('familySupport', val)}
-              frequency={expenses.familySupport?.frequency ?? 'M'}
+              frequency={expenses.familySupport?.frequency ?? 'N'}
               onFrequencyChange={(freq) => updateExpense('familySupport', undefined, freq)}
               currency={currency}
             />
@@ -253,7 +330,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
           <div className="space-y-5">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
               <h3 className="text-sm font-bold text-zinc-900 tracking-tight flex items-center gap-1">
-                Subscriptions & lifestyle <span className="text-rose-500 text-xs font-bold">*</span>
+                Subscriptions & lifestyle (E & W) <span className="text-rose-500 text-xs font-bold">*</span>
               </h3>
               <span className="text-xs font-semibold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md">
                 {formatCurrency(totals.discretionary, currency)}/mo
@@ -268,7 +345,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.phoneInternet?.amount ?? ''}
               onChange={(val) => updateExpense('phoneInternet', val)}
-              frequency={expenses.phoneInternet?.frequency ?? 'M'}
+              frequency={expenses.phoneInternet?.frequency ?? 'E'}
               onFrequencyChange={(freq) => updateExpense('phoneInternet', undefined, freq)}
               currency={currency}
             />
@@ -281,7 +358,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.ott?.amount ?? ''}
               onChange={(val) => updateExpense('ott', val)}
-              frequency={expenses.ott?.frequency ?? 'M'}
+              frequency={expenses.ott?.frequency ?? 'W'}
               onFrequencyChange={(freq) => updateExpense('ott', undefined, freq)}
               currency={currency}
             />
@@ -294,7 +371,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.entertainment?.amount ?? ''}
               onChange={(val) => updateExpense('entertainment', val)}
-              frequency={expenses.entertainment?.frequency ?? 'M'}
+              frequency={expenses.entertainment?.frequency ?? 'W'}
               onFrequencyChange={(freq) => updateExpense('entertainment', undefined, freq)}
               currency={currency}
             />
@@ -307,7 +384,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.shopping?.amount ?? ''}
               onChange={(val) => updateExpense('shopping', val)}
-              frequency={expenses.shopping?.frequency ?? 'M'}
+              frequency={expenses.shopping?.frequency ?? 'W'}
               onFrequencyChange={(freq) => updateExpense('shopping', undefined, freq)}
               currency={currency}
             />
@@ -320,7 +397,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.travel?.amount ?? ''}
               onChange={(val) => updateExpense('travel', val)}
-              frequency={expenses.travel?.frequency ?? 'M'}
+              frequency={expenses.travel?.frequency ?? 'W'}
               onFrequencyChange={(freq) => updateExpense('travel', undefined, freq)}
               currency={currency}
             />
@@ -333,7 +410,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               }
               value={expenses.other?.amount ?? ''}
               onChange={(val) => updateExpense('other', val)}
-              frequency={expenses.other?.frequency ?? 'M'}
+              frequency={expenses.other?.frequency ?? 'W'}
               onFrequencyChange={(freq) => updateExpense('other', undefined, freq)}
               currency={currency}
             />
@@ -513,8 +590,15 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
               <div className="text-xl sm:text-2xl font-black text-rose-700">
                 {formatCurrency(totals.total, currency)}
               </div>
-              <div className="text-[11px] text-zinc-500">
-                Essential: {formatCurrency(totals.essential, currency)} · Discretionary: {formatCurrency(totals.discretionary, currency)}
+              <div className="text-[11px] text-zinc-600 flex flex-wrap gap-x-2">
+                <span>Needs (N): <strong>{formatCurrency(totals.needs, currency)}</strong></span>
+                <span>•</span>
+                <span>Expenses (E): <strong>{formatCurrency(totals.regularExpenses, currency)}</strong></span>
+                <span>•</span>
+                <span>Wants (W): <strong>{formatCurrency(totals.wants, currency)}</strong></span>
+              </div>
+              <div className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block mt-1">
+                Emergency Runway Baseline (N + E): {formatCurrency(totals.essential, currency)}/mo
               </div>
             </div>
 
@@ -543,7 +627,7 @@ export const Step2Expenses: React.FC<Step2Props> = ({ data, onChange, showErrors
                 savingsAmount >= 0 ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'
               }`}>
                 {savingsAmount >= 0 
-                  ? `${savingsPct}% available for debt EMIs, SIPs & goals` 
+                  ? `${savingsPct}% available for SIP investments, wealth & goals` 
                   : `Monthly deficit of ${formatCurrency(Math.abs(savingsAmount), currency)}`}
               </div>
             </div>

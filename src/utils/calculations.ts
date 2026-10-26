@@ -45,52 +45,100 @@ export function parseNum(val: number | string | '' | undefined | null): number {
 
 export function getMonthlyExpense(item: ExpenseItem | undefined): number {
   if (!item) return 0;
-  const amt = parseNum(item.amount);
-  if (item.frequency === 'N') return 0;
-  if (item.frequency === 'W') return amt * 4.333;
-  return amt; // 'M'
+  return parseNum(item.amount);
 }
 
 export function calculateTotalMonthlyExpenses(
   expenses: MonthlyExpenses,
-  customExpenses?: CustomExpenseItem[]
+  customExpenses?: CustomExpenseItem[],
+  loans?: LoanItem[]
 ): {
   total: number;
-  essential: number;
-  discretionary: number;
+  essential: number; // N + E (Emergency Fund baseline)
+  discretionary: number; // W (Wants)
+  needs: number;
+  regularExpenses: number;
+  wants: number;
 } {
-  const rent = getMonthlyExpense(expenses.rent);
-  const food = getMonthlyExpense(expenses.food);
-  const transport = getMonthlyExpense(expenses.transport);
-  const utilities = getMonthlyExpense(expenses.utilities);
-  const phoneInternet = getMonthlyExpense(expenses.phoneInternet);
-  const healthcare = getMonthlyExpense(expenses.healthcare);
-  const familySupport = getMonthlyExpense(expenses.familySupport);
-  const education = getMonthlyExpense(expenses.education);
+  let needs = 0;
+  let regularExpenses = 0;
+  let wants = 0;
 
-  const ott = getMonthlyExpense(expenses.ott);
-  const entertainment = getMonthlyExpense(expenses.entertainment);
-  const shopping = getMonthlyExpense(expenses.shopping);
-  const travel = getMonthlyExpense(expenses.travel);
-  const other = getMonthlyExpense(expenses.other);
+  const defaultCategories: Record<keyof MonthlyExpenses, 'N' | 'E' | 'W'> = {
+    rent: 'N',
+    food: 'N',
+    healthcare: 'N',
+    education: 'N',
+    familySupport: 'N',
+    loans: 'N',
+    utilities: 'E',
+    transport: 'E',
+    phoneInternet: 'E',
+    ott: 'W',
+    entertainment: 'W',
+    shopping: 'W',
+    travel: 'W',
+    other: 'W',
+  };
 
-  let essential = rent + food + transport + utilities + phoneInternet + healthcare + familySupport + education;
-  let discretionary = ott + entertainment + shopping + travel + other;
+  for (const key of Object.keys(defaultCategories) as (keyof MonthlyExpenses)[]) {
+    const item = expenses[key];
+    const amt = getMonthlyExpense(item);
+    if (amt > 0) {
+      const freq = item?.frequency;
+      const tag: 'N' | 'E' | 'W' =
+        freq === 'N'
+          ? 'N'
+          : freq === 'W'
+          ? 'W'
+          : freq === 'E' || freq === 'M'
+          ? 'E'
+          : defaultCategories[key];
+
+      if (tag === 'N') needs += amt;
+      else if (tag === 'E') regularExpenses += amt;
+      else wants += amt;
+    }
+  }
+
+  // If expenses.loans was not explicitly provided or was 0, but loans array exists with monthlyEmi
+  const expenseLoanAmt = getMonthlyExpense(expenses?.loans);
+  if (expenseLoanAmt === 0 && loans && loans.length > 0) {
+    const loanEmiSum = loans.reduce((acc, l) => acc + parseNum(l.monthlyEmi), 0);
+    if (loanEmiSum > 0) {
+      needs += loanEmiSum;
+    }
+  }
 
   if (customExpenses && customExpenses.length > 0) {
     for (const item of customExpenses) {
-      const amt = getMonthlyExpense(item);
-      if (item.category === 'essential') {
-        essential += amt;
-      } else {
-        discretionary += amt;
+      const amt = parseNum(item.amount);
+      if (amt > 0) {
+        const freq = item.frequency;
+        const tag: 'N' | 'E' | 'W' =
+          freq === 'N'
+            ? 'N'
+            : freq === 'W'
+            ? 'W'
+            : freq === 'E'
+            ? 'E'
+            : item.category === 'essential'
+            ? 'E'
+            : 'W';
+
+        if (tag === 'N') needs += amt;
+        else if (tag === 'E') regularExpenses += amt;
+        else wants += amt;
       }
     }
   }
 
+  // Emergency Fund takes N + E (Needs + Expenses)
+  const essential = needs + regularExpenses;
+  const discretionary = wants;
   const total = essential + discretionary;
 
-  return { total, essential, discretionary };
+  return { total, essential, discretionary, needs, regularExpenses, wants };
 }
 
 export function calculateTotalMonthlyIncome(data: AssessmentData): number {
@@ -256,30 +304,30 @@ export function calculateSavingsScore(
   monthlyExpenses: number,
   totalMonthlyEmi: number
 ): SavingsPillarScore {
-  const totalOutflow = monthlyExpenses + totalMonthlyEmi;
+  // Check if monthlyExpenses already contains the loan EMI to prevent double counting
+  const loanInExpenses = parseNum(data.expenses?.loans?.amount);
+  const remainingEmi = Math.max(0, totalMonthlyEmi - loanInExpenses);
+  const totalOutflow = monthlyExpenses + remainingEmi;
   const monthlySurplus = monthlyIncome - totalOutflow;
   const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome) * 100 : 0;
 
-  // Savings rate score out of 15:
-  // Below 0%: 0
-  // 0 - 4.9%: 3
-  // 5 - 9.9%: 6
-  // 10 - 14.9%: 9
-  // 15 - 19.9%: 12
-  // 20% or more: 15
-  let savingsRateScore = 0;
-  if (savingsRate < 0) savingsRateScore = 0;
-  else if (savingsRate < 5) savingsRateScore = 3;
-  else if (savingsRate < 10) savingsRateScore = 6;
-  else if (savingsRate < 15) savingsRateScore = 9;
-  else if (savingsRate < 20) savingsRateScore = 12;
-  else savingsRateScore = 15;
+  // Savings score rule:
+  // If total saving is 20% or more (or >= 25%), award full mark (25/25 pts)
+  // Else based on saving give the mark: e.g. 15% gives 15 marks, below 10% the same percentage is mark (e.g. 8% -> 8 marks)
+  const roundedSavingsRate = Math.round(savingsRate);
+  let score = 0;
+  if (roundedSavingsRate >= 20) {
+    score = 25; // 20% or more gets full mark 25/25
+  } else if (roundedSavingsRate > 0) {
+    score = Math.min(25, roundedSavingsRate); // e.g. 15% -> 15 marks, <10% -> same percentage
+  } else {
+    score = 0; // zero or deficit
+  }
 
-  // Positive cash flow: 5 points
+  const savingsRateScore = score;
   const cashFlowScore = monthlySurplus > 0 ? 5 : 0;
 
-  // Consistency and affordability of savings: 5 points
-  // Check if user invests monthly or builds emergency fund comfortably
+  // Consistency and affordability of savings
   const totalInvestmentsMonthly = data.assets.reduce(
     (acc, item) => acc + parseNum(item.monthlyContribution),
     0
@@ -293,7 +341,6 @@ export function calculateSavingsScore(
     consistencyScore = 0;
   }
 
-  const score = Math.min(25, savingsRateScore + cashFlowScore + consistencyScore);
   const targetMonthlySavings = Math.round(monthlyIncome * 0.2); // 20% benchmark
 
   return {
@@ -302,7 +349,7 @@ export function calculateSavingsScore(
     cashFlowScore,
     consistencyScore,
     monthlyIncome: Math.round(monthlyIncome),
-    monthlyExpenses: Math.round(monthlyExpenses),
+    monthlyExpenses: Math.round(totalOutflow),
     monthlySurplus: Math.round(monthlySurplus),
     savingsRate: Math.round(savingsRate * 10) / 10,
     targetMonthlySavings
@@ -315,10 +362,10 @@ export function calculateDebtScore(
 ): DebtPillarScore {
   if (!data.hasLoans || data.loans.length === 0) {
     return {
-      score: 25,
-      emiScore: 10,
+      score: 25, // 25 / 25 pillar score = 100 on radar
+      emiScore: 12,
       highInterestScore: 10,
-      repaymentScore: 5,
+      repaymentScore: 8,
       totalDebtPrincipal: 0,
       totalMonthlyEmi: 0,
       emiToIncomeRatio: 0,
@@ -333,15 +380,18 @@ export function calculateDebtScore(
   let highInterestDebt = 0;
   let overdueAmount = 0;
   let hasOverdueDebt = false;
+  let maxRemainingMonths = 0;
 
   for (const loan of data.loans) {
     const principal = parseNum(loan.principal);
     const emi = parseNum(loan.monthlyEmi);
     const rate = parseNum(loan.interestRate);
     const overdue = parseNum(loan.overdueAmount);
+    const remMonths = parseNum(loan.remainingMonths);
 
     totalDebtPrincipal += principal;
     totalMonthlyEmi += emi;
+    if (remMonths > maxRemainingMonths) maxRemainingMonths = remMonths;
 
     if (loan.type === 'credit_card' || loan.type === 'consumer_durable' || rate >= 14) {
       highInterestDebt += principal;
@@ -353,41 +403,80 @@ export function calculateDebtScore(
     }
   }
 
-  const emiToIncomeRatio = monthlyIncome > 0 ? (totalMonthlyEmi / monthlyIncome) * 100 : 0;
+  const expenseLoanEmi = parseNum(data.expenses?.loans?.amount);
+  if (totalMonthlyEmi === 0 && expenseLoanEmi > 0) {
+    totalMonthlyEmi = expenseLoanEmi;
+  }
 
-  // EMI ratio points out of 10:
-  // <= 20%: 10
-  // Above 20% to 30%: 8
-  // Above 30% to 40%: 5
-  // Above 40% to 50%: 2
-  // Above 50%: 0
+  // If debts sum to zero -> No debt: full 100 marks!
+  if (totalDebtPrincipal === 0 && totalMonthlyEmi === 0) {
+    return {
+      score: 25,
+      emiScore: 12,
+      highInterestScore: 10,
+      repaymentScore: 8,
+      totalDebtPrincipal: 0,
+      totalMonthlyEmi: 0,
+      emiToIncomeRatio: 0,
+      highInterestDebt: 0,
+      hasOverdueDebt: false,
+      overdueAmount: 0
+    };
+  }
+
+  // USER RULE: When user has debt, the score must be strictly BELOW 30 (0 - 29 out of 100).
+  // Evaluated across 3 criteria:
+  // 1. Monthly EMI ratio < 30% of income (up to 12 marks)
+  // 2. How many years to complete loans (up to 8 marks)
+  // 3. Debt as a percentage of total assets around 20% - 30% (up to 10 marks)
+
+  // 1. EMI or loan pay monthly < 30%
+  const emiToIncomeRatio = monthlyIncome > 0 ? (totalMonthlyEmi / monthlyIncome) * 100 : 0;
   let emiScore = 0;
-  if (emiToIncomeRatio <= 20) emiScore = 10;
+  if (emiToIncomeRatio <= 15) emiScore = 12;
+  else if (emiToIncomeRatio <= 25) emiScore = 10;
   else if (emiToIncomeRatio <= 30) emiScore = 8;
-  else if (emiToIncomeRatio <= 40) emiScore = 5;
+  else if (emiToIncomeRatio <= 40) emiScore = 4;
   else if (emiToIncomeRatio <= 50) emiScore = 2;
   else emiScore = 0;
 
-  // High-interest debt exposure out of 10:
-  let highInterestScore = 10;
-  if (highInterestDebt > 0) {
-    const ratioToIncome = monthlyIncome > 0 ? highInterestDebt / (monthlyIncome * 12) : 1;
-    if (ratioToIncome > 0.5) highInterestScore = 0;
-    else if (ratioToIncome > 0.2) highInterestScore = 3;
-    else if (ratioToIncome > 0.05) highInterestScore = 6;
-    else highInterestScore = 8;
-  }
+  // 2. How many years to complete
+  const remainingYears = maxRemainingMonths > 0 ? maxRemainingMonths / 12 : 3;
+  let tenureScore = 0;
+  if (remainingYears <= 2) tenureScore = 8;
+  else if (remainingYears <= 4) tenureScore = 6;
+  else if (remainingYears <= 7) tenureScore = 4;
+  else if (remainingYears <= 12) tenureScore = 2;
+  else tenureScore = 1;
 
-  // Repayment status: 5 points if clean, 0 if overdue
-  const repaymentScore = hasOverdueDebt ? 0 : 5;
+  // 3. Total assets and debt percentage (20% to 30% benchmark)
+  const liquidSavings = parseNum(data.emergencyFund?.liquidSavings);
+  const assetsTotal = (data.assets || []).reduce((acc, a) => acc + parseNum(a.currentValue), 0);
+  const totalAssets = liquidSavings + assetsTotal;
+  const debtToAssetRatio = totalAssets > 0 ? (totalDebtPrincipal / totalAssets) * 100 : 100;
 
-  const score = Math.min(25, emiScore + highInterestScore + repaymentScore);
+  let assetScore = 0;
+  if (debtToAssetRatio <= 20) assetScore = 10;
+  else if (debtToAssetRatio <= 30) assetScore = 8;
+  else if (debtToAssetRatio <= 50) assetScore = 5;
+  else if (debtToAssetRatio <= 80) assetScore = 2;
+  else assetScore = 0;
+
+  // Overdue penalty
+  const overduePenalty = hasOverdueDebt ? 12 : 0;
+
+  // Final score on 100 scale: strictly below 30 only! (max 29)
+  const rawScore = emiScore + tenureScore + assetScore - overduePenalty;
+  const debtScore100 = Math.min(29, Math.max(0, Math.round(rawScore)));
+
+  // Map to 25-point pillar scale
+  const score = Math.round((debtScore100 / 100) * 25 * 10) / 10;
 
   return {
     score,
     emiScore,
-    highInterestScore,
-    repaymentScore,
+    highInterestScore: assetScore,
+    repaymentScore: tenureScore,
     totalDebtPrincipal: Math.round(totalDebtPrincipal),
     totalMonthlyEmi: Math.round(totalMonthlyEmi),
     emiToIncomeRatio: Math.round(emiToIncomeRatio * 10) / 10,
@@ -592,7 +681,7 @@ export function generateRecommendations(
 
 export function calculateFinScore(data: AssessmentData): FinScoreResult {
   const monthlyIncome = calculateTotalMonthlyIncome(data);
-  const expenseBreakdown = calculateTotalMonthlyExpenses(data.expenses, data.customExpenses);
+  const expenseBreakdown = calculateTotalMonthlyExpenses(data.expenses, data.customExpenses, data.loans);
   const currency = data.personal?.currency || 'INR';
 
   const isCompletelyEmpty =
@@ -770,30 +859,13 @@ export function calculateFinScore(data: AssessmentData): FinScoreResult {
     let progressPct = 0;
 
     if (targetAmt > 0) {
-      progressPct = Math.min(100, Math.round((saved / targetAmt) * 100));
-
-      if (saved >= targetAmt) {
-        score = 100;
-        onTrack = true;
-      } else if (saved === 0 && cont === 0) {
-        // Not saving now (zero saved & zero contribution) -> exactly 0 marks!
-        score = 0;
-        onTrack = false;
-      } else {
-        const fundingRatio = monthlyRequired > 0 ? Math.min(1, cont / monthlyRequired) : 0;
-        const progressRatio = Math.min(1, saved / targetAmt);
-
-        if (cont >= monthlyRequired && cont > 0) {
-          onTrack = true;
-          score = Math.min(100, Math.round(80 + progressRatio * 20));
-        } else {
-          onTrack = false;
-          // Partial credit only based on actual contribution rate and saved corpus
-          score = Math.min(79, Math.round((fundingRatio * 65) + (progressRatio * 20)));
-        }
-      }
+      // Score directly based on current savings: 10k out of 1L = 10 marks, full = 100 marks
+      score = Math.min(100, Math.max(0, Math.round((saved / targetAmt) * 100)));
+      progressPct = score;
+      onTrack = saved >= targetAmt || (cont >= monthlyRequired && monthlyRequired > 0 && cont > 0);
     } else {
       score = 0;
+      progressPct = 0;
       onTrack = false;
     }
 

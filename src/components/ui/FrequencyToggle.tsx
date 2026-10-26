@@ -9,16 +9,31 @@ interface FrequencyToggleProps {
 }
 
 export const FrequencyToggle: React.FC<FrequencyToggleProps> = ({ value, onChange }) => {
-  const options: { id: ExpenseFrequency; label: string; tooltip: string }[] = [
-    { id: 'N', label: 'N', tooltip: 'None / Zero' },
-    { id: 'M', label: 'M', tooltip: 'Monthly amount' },
-    { id: 'W', label: 'W', tooltip: 'Weekly amount' },
+  const options: { id: ExpenseFrequency; label: string; tooltip: string; activeStyle: string }[] = [
+    {
+      id: 'N',
+      label: 'N',
+      tooltip: 'Need: Essential survival need (included in Emergency Fund)',
+      activeStyle: 'bg-emerald-600 text-white font-extrabold shadow-xs',
+    },
+    {
+      id: 'E',
+      label: 'E',
+      tooltip: 'Expense: Regular recurring expense (included in Emergency Fund)',
+      activeStyle: 'bg-blue-600 text-white font-extrabold shadow-xs',
+    },
+    {
+      id: 'W',
+      label: 'W',
+      tooltip: 'Want: Discretionary / lifestyle spend (excluded from Emergency Fund)',
+      activeStyle: 'bg-amber-500 text-white font-extrabold shadow-xs',
+    },
   ];
 
   return (
-    <div className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5 select-none shrink-0 shadow-2xs">
+    <div className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-50/80 p-0.5 select-none shrink-0 shadow-2xs">
       {options.map((opt) => {
-        const isActive = value === opt.id;
+        const isActive = value === opt.id || (opt.id === 'E' && value === 'M');
         return (
           <button
             key={opt.id}
@@ -27,8 +42,8 @@ export const FrequencyToggle: React.FC<FrequencyToggleProps> = ({ value, onChang
             onClick={() => onChange(opt.id)}
             className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-xs transition-all rounded-md cursor-pointer ${
               isActive
-                ? 'bg-[#eaf5ef] text-[#1b4d3e] font-bold border border-[#b7dfcb] shadow-xs'
-                : 'text-zinc-500 font-medium hover:text-zinc-800 hover:bg-white/60'
+                ? opt.activeStyle
+                : 'text-zinc-500 font-semibold hover:text-zinc-900 hover:bg-white/80'
             }`}
           >
             {opt.label}

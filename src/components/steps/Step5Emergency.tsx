@@ -15,7 +15,7 @@ interface Step5Props {
 export const Step5Emergency: React.FC<Step5Props> = ({ data, onChange }) => {
   const { emergencyFund, expenses, personal } = data;
   const currency = personal.currency;
-  const expenseTotals = calculateTotalMonthlyExpenses(expenses);
+  const expenseTotals = calculateTotalMonthlyExpenses(expenses, data.customExpenses, data.loans);
 
   const updateEmergency = (field: keyof EmergencyFund, val: any) => {
     onChange({
@@ -144,7 +144,7 @@ export const Step5Emergency: React.FC<Step5Props> = ({ data, onChange }) => {
           {/* Metric Triplet */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
             <div className="bg-white p-3 rounded-xl border border-emerald-100">
-              <div className="text-[11px] text-zinc-500 font-medium">Essential Monthly Burn</div>
+              <div className="text-[11px] text-zinc-500 font-medium">Essential Monthly Burn (N + E)</div>
               <div className="text-sm font-bold text-zinc-900">
                 {formatCurrency(emergencyScore.essentialMonthlyExpenses, currency)}/mo
               </div>

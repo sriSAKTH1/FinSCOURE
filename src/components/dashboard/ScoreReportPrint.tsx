@@ -514,6 +514,7 @@ export const ScoreReportPrint: React.FC<ScoreReportPrintProps> = ({
                     <tr className="bg-[#1b4d3e] text-white font-bold text-[10px] uppercase">
                       <th className="py-1.5 px-3">Goal</th>
                       <th className="py-1.5 px-2.5">Target</th>
+                      <th className="py-1.5 px-2.5">Saved</th>
                       <th className="py-1.5 px-2.5">Year</th>
                       <th className="py-1.5 px-2.5">Required /mo</th>
                       <th className="py-1.5 px-2.5">Current /mo</th>
@@ -526,6 +527,7 @@ export const ScoreReportPrint: React.FC<ScoreReportPrintProps> = ({
                       <tr key={g.goalId} className="hover:bg-zinc-50">
                         <td className="py-1.5 px-3 font-bold text-zinc-900">{g.name}</td>
                         <td className="py-1.5 px-2.5 font-semibold text-zinc-800">{formatCurrency(g.targetAmount, curr)}</td>
+                        <td className="py-1.5 px-2.5 font-bold text-emerald-800">{formatCurrency(g.savedAmount || 0, curr)}</td>
                         <td className="py-1.5 px-2.5 text-zinc-600">{g.targetYear} ({g.yearsRemaining}y)</td>
                         <td className="py-1.5 px-2.5 font-bold text-[#1b4d3e]">{formatCurrency(g.monthlyRequired, curr)}/mo</td>
                         <td className="py-1.5 px-2.5 text-zinc-700">{formatCurrency(g.currentMonthlyContribution, curr)}/mo</td>
@@ -542,6 +544,7 @@ export const ScoreReportPrint: React.FC<ScoreReportPrintProps> = ({
                     <tr className="bg-zinc-100 font-extrabold text-zinc-900 border-t-2 border-zinc-300 text-[10px]">
                       <td className="py-1.5 px-3">Total Active Goals</td>
                       <td className="py-1.5 px-2.5">{formatCurrency(totalActiveTargetAmount, curr)}</td>
+                      <td className="py-1.5 px-2.5 text-emerald-800">{formatCurrency(activeGoals.reduce((sum, g) => sum + (g.savedAmount || 0), 0), curr)}</td>
                       <td className="py-1.5 px-2.5">—</td>
                       <td className="py-1.5 px-2.5 text-[#1b4d3e]">{formatCurrency(totalActiveRequiredMonthly, curr)}/mo</td>
                       <td className="py-1.5 px-2.5">—</td>
